@@ -1,0 +1,43 @@
+erDiagram
+    Users ||--o{ Friendships : "envía/recibe solicitud"
+    Users ||--o{ GroupMembers : "pertenece a"
+    Users ||--o{ Messages : "envía mensaje"
+    Groups ||--o{ GroupMembers : "tiene miembros"
+    Groups ||--o{ Messages : "recibe mensajes de grupo"
+    
+    Users {
+        int id PK
+        string username
+        string password_hash
+        string status "online/offline"
+        datetime last_seen
+    }
+    Friendships {
+        int id PK
+        int user_id FK "Solicitante"
+        int friend_id FK "Solicitado"
+        string status "pending/accepted/rejected"
+        datetime created_at
+    }
+    Groups {
+        int id PK
+        string name
+        int creator_id FK
+        datetime created_at
+    }
+    GroupMembers {
+        int id PK
+        int group_id FK
+        int user_id FK
+        string status "invited/accepted/rejected/left"
+        datetime joined_at
+    }
+    Messages {
+        int id PK
+        int sender_id FK
+        string receiver_type "user o group"
+        int receiver_id
+        string content
+        string status "sent/delivered/read/pending_hidden"
+        datetime timestamp
+    } 
