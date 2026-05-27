@@ -43,13 +43,32 @@ Consulta el archivo `schema.sql` en `/docs` para ver la estructura completa.
 
 ## 📂 Estructura del proyecto
 ```
-/src/main/java/com/messenger/
-├── server/ → Servidor principal, ClientHandler, ThreadManager
-├── client/ → UI Swing, LoginFrame, Dashboard
-├── database/ → DAO, conexión DB, consultas SQL
-├── model/ → POJOs: User, Group, Message, Friendship
-├── network/ → Protocolo, compresor LZ77, JSONParser
-└── service/ → Lógica de negocio (FriendsService, GroupService, PendingService)
+IP-Messenger/
+├── .gitignore
+├── README.md
+├── LICENSE
+├── docs/
+├── common/
+│   └── src/main/java/com/messenger/
+│       ├── model/
+│       ├── network/
+│       └── utils/
+├── server/
+│   └── src/main/java/com/messenger/server/
+│       ├── MainServer.java
+│       ├── ClientHandler.java
+│       ├── ThreadManager.java
+│       ├── database/
+│       └── service/
+└── client/
+    └── src/main/java/com/messenger/client/
+        ├── MainClient.java
+        ├── LoginFrame.java
+        ├── Dashboard.java
+        ├── ChatDialog.java
+        ├── PendingMessagesWindow.java
+        ├── NotificationsPanel.java
+        └── NetworkClient.java  # Socket del lado cliente
 ```
 
 
@@ -81,4 +100,4 @@ MIT. Ver archivo `LICENSE`.
 
 ## 👨‍🏫 Asignatura
 
-Programación Avanzada – Universidad XYZ – Equipo de 10 personas.
+Programación Avanzada II – Centro de Enseñanza Técnica Industrial – Equipo de 10 personas.
