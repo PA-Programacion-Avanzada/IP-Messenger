@@ -68,29 +68,29 @@ IP-Messenger/
         ├── ChatDialog.java
         ├── PendingMessagesWindow.java
         ├── NotificationsPanel.java
-        └── NetworkClient.java  # Socket del lado cliente
+        └── NetworkClient.java
 ```
 
 
 ## 🏃 Cómo ejecutar
 
 1. Clonar el repositorio:
-   {codigo}bash
+   ```bash
    git clone https://github.com/TU-USUARIO/IP-Messenger.git
    cd IP-Messenger
-   {codigo}
+   ```
 
 2. Compilar y ejecutar el servidor:
-   {codigo}bash
+   ```bash
    javac -d out src/main/java/com/messenger/server/Main.java
    java -cp out com.messenger.server.Main
-   {codigo}
+   ```
 
 3. Ejecutar el cliente (tantas veces como se desee):
-   {codigo}bash
+   ```bash
    javac -d out src/main/java/com/messenger/client/Main.java
    java -cp out com.messenger.client.Main
-   {codigo}
+   ```
 
 > La base de datos `messenger.db` se creará automáticamente al iniciar el servidor.
 
