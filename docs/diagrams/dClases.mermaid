@@ -1,0 +1,42 @@
+classDiagram
+    %% Paquete core
+    class Server
+    class ClientHandler
+    class ThreadPoolManager
+
+    %% Paquete database
+    class DatabaseManager
+    class UserDAO
+    class MessageDAO
+    class FriendshipDAO
+    class GroupDAO
+
+    %% Paquete logic
+    class MessageManager
+    class GroupManager
+    class FriendshipManager
+    class UserManager
+
+    %% Paquete network
+    class LZ77Compressor
+    class JSONParser
+    class Protocol
+
+    %% Paquete utils
+    class ConfigLoader
+    class Logger
+
+    %% Relaciones
+    Server --> ThreadPoolManager : "usa"
+    Server --> ClientHandler : "crea"
+    Server --> DatabaseManager : "usa"
+    ClientHandler --> MessageManager : "usa"
+    ClientHandler --> FriendshipManager : "usa"
+    ClientHandler --> GroupManager : "usa"
+    MessageManager --> MessageDAO : "accede"
+    MessageManager --> LZ77Compressor : "usa"
+    FriendshipManager --> FriendshipDAO : "accede"
+    GroupManager --> GroupDAO : "accede"
+    UserManager --> UserDAO : "accede"
+    UserManager --> DatabaseManager : "usa"
+    DatabaseManager --> ConfigLoader : "lee configuración"

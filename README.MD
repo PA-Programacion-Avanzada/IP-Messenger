@@ -22,7 +22,7 @@ IP Messenger es una aplicación de mensajería instantánea escrita en Java. Imp
 
 ## 🛠️ Tecnologías
 
-- Java 11
+- Java 21
 - Java Swing (GUI)
 - Sockets (java.net)
 - ExecutorService (Thread Pool)
@@ -31,15 +31,15 @@ IP Messenger es una aplicación de mensajería instantánea escrita en Java. Imp
 
 ## 🗄️ Base de datos (SQL)
 
-La base de datos contiene las siguientes tablas:
+La base de datos `messenger.db` contiene las siguientes tablas:
 
-- Users
-- Friendships
-- Groups
-- GroupMembers
-- Messages
+- **Users** (id, username, password_hash, status, last_seen)
+- **Friendships** (id, user_id, friend_id, status, created_at)
+- **Groups** (id, name, creator_id, created_at)
+- **GroupMembers** (id, group_id, user_id, status, joined_at)
+- **Messages** (id, sender_id, receiver_type, receiver_id, content, status, timestamp)
 
-Consulta el archivo `schema.sql` en `/docs` para ver la estructura completa.
+Para ver el esquema completo, consulta `docs/schema.sql`.
 
 ## 📂 Estructura del proyecto
 ```
@@ -48,46 +48,42 @@ IP-Messenger/
 ├── README.md
 ├── LICENSE
 ├── docs/
-├── server/
-│   └── src/main/java/com/messenger/server/
-│       ├── MainServer.java
-│       ├── ClientHandler.java
-│       ├── ThreadManager.java
-│       ├── database/
-│       └── service/
-└── client/
-    └── src/main/java/com/messenger/client/
-        ├── MainClient.java
-        ├── LoginFrame.java
-        ├── Dashboard.java
-        ├── ChatDialog.java
-        ├── PendingMessagesWindow.java
-        ├── NotificationsPanel.java
-        └── NetworkClient.java
+├── server/ # Proyecto IPMessengerServer
+│ └── src/com/ipmessenger/server/
+│ │ ├── Main.java
+│ │ ├── core/
+│ │ ├── database/
+│ │ ├── logic/
+│ │ ├── network/
+│ │ └── utils/
+└── client/ # Proyecto IPMessengerClient
+│ └── src/com/ipmessenger/client/
+│ │ ├── Main.java
+│ │ ├── ui/
+│ │ ├── core/
+│ │ ├── network/
+│ │ └── models/
 ```
-
 
 ## 🏃 Cómo ejecutar
 
 1. Clonar el repositorio:
    ```bash
-   git clone https://github.com/TU-USUARIO/IP-Messenger.git
+   git clone https://github.com/PA-Programacion-Avanzada/IP-Messenger.git
    cd IP-Messenger
    ```
 
-2. Compilar y ejecutar el servidor:
+2. Compilar y ejecutar el servidor (desde la carpeta server/):
    ```bash
-   javac -d out src/main/java/com/messenger/server/Main.java
-   java -cp out com.messenger.server.Main
+	javac -d out src/com/ipmessenger/server/Main.java
+	java -cp out com.ipmessenger.server.Main
    ```
 
-3. Ejecutar el cliente (tantas veces como se desee):
+3. Ejecutar el cliente (desde la carpeta client/):
    ```bash
-   javac -d out src/main/java/com/messenger/client/Main.java
-   java -cp out com.messenger.client.Main
+	javac -d out src/com/ipmessenger/client/Main.java
+	java -cp out com.ipmessenger.client.Main
    ```
-
-> La base de datos `messenger.db` se creará automáticamente al iniciar el servidor.
 
 ## 📄 Licencia
 
