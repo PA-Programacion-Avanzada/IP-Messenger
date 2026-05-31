@@ -1,4 +1,4 @@
-// Modal de invitación a grupo
+//Modal de mensajes temporales
 package ui;
 
 import javax.swing.*;
@@ -7,30 +7,30 @@ import java.awt.*;
 import java.awt.event.*;
 
 /**
- * GroupInviteModal - Modal para enviar mensajes a un grupo.
- * El mensaje será visible para todos los miembros del grupo.
+ * TemporalMessageModal - Modal para enviar mensajes temporales.
+ * Los mensajes no se guardan en la base de datos y se borran al desconectarse.
  */
-public class GroupInviteModal extends JDialog {
+public class TemporalMessageModal extends JDialog {
 
-    private String groupName;
+    private String recipientName;
     private JTextArea messageArea;
     private JButton sendButton;
     private JButton cancelButton;
 
-    private OnSendGroupMessageListener onSendListener;
+    private OnSendTemporalMessageListener onSendListener;
     private OnCancelListener onCancelListener;
 
-    public interface OnSendGroupMessageListener {
-        void onSendGroupMessage(String groupName, String message);
+    public interface OnSendTemporalMessageListener {
+        void onSendTemporalMessage(String recipientName, String message);
     }
 
     public interface OnCancelListener {
         void onCancel();
     }
 
-    public GroupInviteModal(Frame owner, String groupName) {
-        super(owner, "Enviar al Grupo: " + groupName, true);
-        this.groupName = groupName;
+    public TemporalMessageModal(Frame owner, String recipientName) {
+        super(owner, "Mensaje temporal a: " + recipientName, true);
+        this.recipientName = recipientName;
         initUI();
         setSize(400, 350);
         setLocationRelativeTo(owner);
@@ -46,8 +46,13 @@ public class GroupInviteModal extends JDialog {
                 mainPanel.getBorder()
         ));
 
+        // Cabecera con título y botón cerrar
         mainPanel.add(createHeaderPanel(), BorderLayout.NORTH);
+
+        // Panel central con texto explicativo y área de mensaje
         mainPanel.add(createCenterPanel(), BorderLayout.CENTER);
+
+        // Panel inferior con botones
         mainPanel.add(createButtonPanel(), BorderLayout.SOUTH);
 
         add(mainPanel);
@@ -58,7 +63,7 @@ public class GroupInviteModal extends JDialog {
         header.setBackground(Color.WHITE);
         header.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
 
-        JLabel titleLabel = new JLabel("Enviar al Grupo: " + groupName);
+        JLabel titleLabel = new JLabel("Mensaje a: " + recipientName + " (Temporal)");
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
         header.add(titleLabel, BorderLayout.WEST);
 
@@ -79,7 +84,7 @@ public class GroupInviteModal extends JDialog {
         center.setBackground(Color.WHITE);
         center.setBorder(BorderFactory.createEmptyBorder(5, 0, 15, 0));
 
-        JLabel infoLabel = new JLabel("El mensaje será visible para todos los miembros del grupo.");
+        JLabel infoLabel = new JLabel("<html>Este mensaje se borrará cuando el remitente o el destinatario se desconecten.<br/>No se guardará en la base de datos.</html>");
         infoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         infoLabel.setForeground(new Color(100, 100, 100));
         center.add(infoLabel, BorderLayout.NORTH);
@@ -134,7 +139,7 @@ public class GroupInviteModal extends JDialog {
             dispose();
         });
 
-        sendButton = new JButton("Enviar al Grupo");
+        sendButton = new JButton("Enviar a " + recipientName);
         sendButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
         sendButton.setBackground(new Color(0, 123, 255));
         sendButton.setForeground(Color.WHITE);
@@ -148,7 +153,7 @@ public class GroupInviteModal extends JDialog {
                 return;
             }
             if (onSendListener != null) {
-                onSendListener.onSendGroupMessage(groupName, msg);
+                onSendListener.onSendTemporalMessage(recipientName, msg);
             }
             dispose();
         });
@@ -175,7 +180,7 @@ public class GroupInviteModal extends JDialog {
         }
     }
 
-    public void setOnSendGroupMessageListener(OnSendGroupMessageListener listener) {
+    public void setOnSendTemporalMessageListener(OnSendTemporalMessageListener listener) {
         this.onSendListener = listener;
     }
 
@@ -185,7 +190,7 @@ public class GroupInviteModal extends JDialog {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            GroupInviteModal modal = new GroupInviteModal(null, "Estudio Java");
+            TemporalMessageModal modal = new TemporalMessageModal(null, "Juan Pérez");
             modal.setVisible(true);
         });
     }
