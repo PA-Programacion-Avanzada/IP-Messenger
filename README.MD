@@ -48,11 +48,6 @@ IP-Messenger/
 ├── README.md
 ├── LICENSE
 ├── docs/
-├── common/
-│   └── src/main/java/com/messenger/
-│       ├── model/
-│       ├── network/
-│       └── utils/
 ├── server/
 │   └── src/main/java/com/messenger/server/
 │       ├── MainServer.java
