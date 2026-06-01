@@ -11,14 +11,14 @@ import javax.swing.*;
  * Para integrar con la lógica de negocio, reemplazar los métodos dummy
  * con llamadas reales a los controladores/servicios.
  */
-public class MainLauncher {
+public class Main {
 
     private StartWindow startWindow;
     private DashboardWindow dashboardWindow;
     private ChatModal chatModal;
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new MainLauncher().start());
+        SwingUtilities.invokeLater(() -> new Main().start());
     }
 
     private void start() {
