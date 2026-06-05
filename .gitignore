@@ -1,7 +1,16 @@
-/server/IPMessengerServer/nbproject/private/
-/client/IPMessengerClient/nbproject/private/
-/client/IPMessengerClient/build/
-/client/WEB/nbproject/private/
-/client/WEB/build/
-server/IPMessengerServer/nbproject/project.properties
-server/IPMessengerClient/nbproject/project.properties
+# NetBeans (solo local, no subir al repo)
+**/nbproject/
+
+# Artefactos de build
+**/build/
+**/dist/
+
+# Base de datos local
+messenger.db
+**/*.db
+**/*.db-journal
+
+# IDE
+.idea/
+*.iml
+.vscode/
