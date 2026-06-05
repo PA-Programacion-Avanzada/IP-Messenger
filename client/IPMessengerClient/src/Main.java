@@ -1,32 +1,16 @@
-// Punto de entrada del cliente
-
-
 
 import core.Client;
-
 import core.SessionData;
-
-import network.Protocol;
-
-import ui.*;
-
-
-
-import javax.swing.*;
-
 import java.io.IOException;
-
 import java.time.LocalTime;
-
 import java.time.format.DateTimeFormatter;
-
 import java.util.ArrayList;
-
 import java.util.HashMap;
-
 import java.util.List;
-
 import java.util.Map;
+import javax.swing.*;
+import network.Protocol;
+import ui.*;
 
 
 
