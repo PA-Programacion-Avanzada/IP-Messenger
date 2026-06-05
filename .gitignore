@@ -1,11 +1,5 @@
-# NetBeans — configuración local (rutas, JDK, usuario). No subir al repo.
+# NetBeans (solo local, no subir al repo)
 **/nbproject/
-**/nbproject/private/
-**/private.properties
-**/genfiles.properties
-
-# Plantillas versionadas (sí van al repo):
-# !**/project.properties.example
 
 # Artefactos de build
 **/build/
@@ -20,3 +14,7 @@ messenger.db
 .idea/
 *.iml
 .vscode/
+
+
+./server/IPMessengerServer/nbproject/project.properties
+./server/IPMessengerClient/nbproject/project.properties
