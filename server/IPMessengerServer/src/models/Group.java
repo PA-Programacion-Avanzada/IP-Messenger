@@ -6,9 +6,8 @@ public class Group {
     private int id;
     private String name;
     private int creatorId;
-<<<<<<< HEAD
 
-    public Group() {
+    public Group(int aInt, String string, int aInt1, Timestamp timestamp) {
     }
 
     public Group(int id, String name, int creatorId) {
@@ -41,9 +40,3 @@ public class Group {
         this.creatorId = creatorId;
     }
 }
-=======
-    private Timestamp createdAt;
-
-    // constructores, getters, setters
-}
->>>>>>> 7882dce65d1052a24e564685c9b36b9aca0a72b2

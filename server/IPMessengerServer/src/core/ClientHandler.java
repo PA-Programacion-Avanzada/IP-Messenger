@@ -1,6 +1,6 @@
 package core;
 
-import database.DatabaseManager;
+import database.UserDAO;
 import logic.*;
 import models.User;
 import network.JSONParser;
@@ -374,5 +374,13 @@ public class ClientHandler implements Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void handleGetFriends() {
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+    }
+
+    private void handleGetPendingMsgs() {
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 }
