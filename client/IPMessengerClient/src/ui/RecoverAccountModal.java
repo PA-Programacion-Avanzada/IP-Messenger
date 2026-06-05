@@ -82,7 +82,7 @@ public class RecoverAccountModal extends JDialog {
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
         header.add(titleLabel, BorderLayout.WEST);
 
-        JButton closeButton = new JButton("✕");
+        JButton closeButton = new JButton("X");
         closeButton.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         closeButton.setFocusPainted(false);
         closeButton.setContentAreaFilled(false);

@@ -1,0 +1,94 @@
+# Plantilla de NetBeans para IPMessengerServer.
+# Copia este archivo a nbproject/project.properties después de abrir el proyecto:
+#   copy project.properties.example nbproject\project.properties
+#
+# No edites este .example: personaliza solo la copia en nbproject/ (está en .gitignore).
+
+annotation.processing.enabled=true
+annotation.processing.enabled.in.editor=false
+annotation.processing.processors.list=
+annotation.processing.run.all.processors=true
+annotation.processing.source.output=${build.generated.sources.dir}/ap-source-output
+application.title=IPMessengerServer
+build.classes.dir=${build.dir}/classes
+build.classes.excludes=**/*.java,**/*.form
+build.dir=build
+build.generated.dir=${build.dir}/generated
+build.generated.sources.dir=${build.dir}/generated-sources
+build.sysclasspath=ignore
+build.test.classes.dir=${build.dir}/test/classes
+build.test.results.dir=${build.dir}/test/results
+debug.classpath=\
+    ${run.classpath}
+debug.modulepath=\
+    ${run.modulepath}
+debug.test.classpath=\
+    ${run.test.classpath}
+debug.test.modulepath=\
+    ${run.test.modulepath}
+dist.archive.excludes=
+dist.dir=dist
+dist.jar=${dist.dir}/IPMessengerServer.jar
+dist.javadoc.dir=${dist.dir}/javadoc
+dist.jlink.dir=${dist.dir}/jlink
+dist.jlink.output=${dist.jlink.dir}/IPMessengerServer
+endorsed.classpath=
+excludes=
+file.reference.gson-2.11.0.jar=../../lib/gson-2.11.0.jar
+file.reference.sqlite-jdbc-3.47.2.0.jar=../../lib/sqlite-jdbc-3.47.2.0.jar
+includes=**
+jar.compress=false
+javac.classpath=\
+    ${file.reference.gson-2.11.0.jar}:\
+    ${file.reference.sqlite-jdbc-3.47.2.0.jar}
+javac.compilerargs=
+javac.deprecation=false
+javac.external.vm=true
+javac.modulepath=
+javac.processormodulepath=
+javac.processorpath=\
+    ${javac.classpath}
+javac.source=21
+javac.target=21
+javac.test.classpath=\
+    ${javac.classpath}:\
+    ${build.classes.dir}
+javac.test.modulepath=\
+    ${javac.modulepath}
+javac.test.processorpath=\
+    ${javac.test.classpath}
+javadoc.additionalparam=
+javadoc.author=false
+javadoc.encoding=${source.encoding}
+javadoc.html5=false
+javadoc.noindex=false
+javadoc.nonavbar=false
+javadoc.notree=false
+javadoc.private=false
+javadoc.splitindex=true
+javadoc.use=true
+javadoc.version=false
+javadoc.windowtitle=
+jlink.additionalmodules=
+jlink.additionalparam=
+jlink.launcher=true
+jlink.launcher.name=IPMessengerServer
+main.class=main.Main
+manifest.file=manifest.mf
+meta.inf.dir=${src.dir}/META-INF
+mkdist.disabled=false
+platform.active=default_platform
+run.classpath=\
+    ${javac.classpath}:\
+    ${build.classes.dir}
+run.jvmargs=
+run.modulepath=\
+    ${javac.modulepath}
+run.test.classpath=\
+    ${javac.test.classpath}:\
+    ${build.test.classes.dir}
+run.test.modulepath=\
+    ${javac.test.modulepath}
+source.encoding=UTF-8
+src.dir=src
+test.src.dir=test

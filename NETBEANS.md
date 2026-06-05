@@ -7,27 +7,50 @@
 
 ## Nota sobre `nbproject/`
 
-Las carpetas `nbproject/` **no se suben al repositorio** (están en `.gitignore`). Cada desarrollador las mantiene en local. Si al clonar no existen, NetBeans las regenera al abrir el proyecto Java que tiene `build.xml`.
+Las carpetas `nbproject/` **no se suben al repositorio** (están en `.gitignore`). Ahí vive la configuración local: JDK elegido, rutas absolutas de librerías, usuario de NetBeans, etc.
 
-Configuración local recomendada del servidor (`server/IPMessengerServer/nbproject/project.properties`):
+Al clonar, NetBeans puede regenerar `nbproject/` vacío o con valores por defecto incorrectos (por ejemplo Gson en una ruta que no existe). Usa las plantillas del repo:
+
+| Proyecto | Plantilla (en el repo) | Copiar a (local, ignorado por git) |
+|----------|------------------------|-------------------------------------|
+| Servidor | `server/IPMessengerServer/project.properties.example` | `server/IPMessengerServer/nbproject/project.properties` |
+| Cliente  | `client/IPMessengerClient/project.properties.example` | `client/IPMessengerClient/nbproject/project.properties` |
+
+**Windows (PowerShell), desde la raíz del repo:**
+
+```powershell
+Copy-Item server\IPMessengerServer\project.properties.example server\IPMessengerServer\nbproject\project.properties -Force
+Copy-Item client\IPMessengerClient\project.properties.example client\IPMessengerClient\nbproject\project.properties -Force
+```
+
+**Linux / macOS:**
+
+```bash
+cp server/IPMessengerServer/project.properties.example server/IPMessengerServer/nbproject/project.properties
+cp client/IPMessengerClient/project.properties.example client/IPMessengerClient/nbproject/project.properties
+```
+
+Valores clave en la plantilla del servidor:
 
 - `main.class=main.Main`
 - `javac.source=21` y `javac.target=21`
-- Librerías en `lib/`: `gson-2.11.0.jar` y `sqlite-jdbc-3.47.2.0.jar`
+- Librerías relativas: `../../lib/gson-2.11.0.jar` y `../../lib/sqlite-jdbc-3.47.2.0.jar`
+
+Si necesitas rutas absolutas en tu máquina, edita solo `nbproject/project.properties`, nunca el `.example`.
 
 ## Pasos
 
 1. Abre NetBeans.
 2. **Archivo → Abrir proyecto** y selecciona `server/IPMessengerServer`.
 3. Repite con **Archivo → Abrir proyecto** para `client/IPMessengerClient`.
+4. Copia las plantillas `project.properties.example` a `nbproject/project.properties` (ver tabla arriba).
+5. **Clean and Build** en ambos proyectos.
 
-   También puedes abrir el grupo completo desde la carpeta raíz `IP-Messenger` (NetBeans detectará `nbproject/projectgroup.properties`).
-
-4. Las dependencias externas están en `lib/`:
+6. Las dependencias externas están en `lib/`:
    - `gson-2.11.0.jar`
    - `sqlite-jdbc-3.47.2.0.jar` (solo servidor)
 
-5. Ejecutar:
+7. Ejecutar:
    - **Servidor:** clic derecho en `IPMessengerServer` → **Ejecutar** (clase principal: `main.Main`).
    - **Cliente:** clic derecho en `IPMessengerClient` → **Ejecutar** (clase principal: `Main`).
 

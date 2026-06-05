@@ -1,5 +1,11 @@
-# NetBeans (solo local, no subir al repo)
+# NetBeans — configuración local (rutas, JDK, usuario). No subir al repo.
 **/nbproject/
+**/nbproject/private/
+**/private.properties
+**/genfiles.properties
+
+# Plantillas versionadas (sí van al repo):
+# !**/project.properties.example
 
 # Artefactos de build
 **/build/

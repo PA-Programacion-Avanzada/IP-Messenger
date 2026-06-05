@@ -209,7 +209,7 @@ public class ChatModal extends JFrame {
             else
                 setExtendedState(MAXIMIZED_BOTH);
         });
-        JButton closeButton = createWindowButton("✕");
+        JButton closeButton = createWindowButton("X");
         closeButton.addActionListener(e -> dispose());
         windowButtons.add(minButton);
         windowButtons.add(maxButton);
