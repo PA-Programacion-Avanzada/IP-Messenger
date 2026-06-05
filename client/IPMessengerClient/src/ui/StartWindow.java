@@ -18,11 +18,13 @@ public class StartWindow extends JFrame {
     private JTextField usernameField;
     private JPasswordField passwordField;
     private JButton connectButton;
+    private JLabel forgotPasswordLinkLabel;
     private JLabel registerLinkLabel;
 
     // Listeners para comunicación con el controlador
     private OnConnectListener onConnectListener;
     private OnRegisterLinkListener onRegisterLinkListener;
+    private OnForgotPasswordListener onForgotPasswordListener;
 
     public interface OnConnectListener {
         void onConnect(String serverIp, String username, String password);
@@ -32,11 +34,15 @@ public class StartWindow extends JFrame {
         void onRegisterLinkClicked();
     }
 
+    public interface OnForgotPasswordListener {
+        void onForgotPasswordClicked();
+    }
+
     public StartWindow() {
         initUI();
         setTitle("IP Messenger");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(500, 480);
+        setSize(500, 510);
         setLocationRelativeTo(null);
         setResizable(false);
     }
@@ -145,7 +151,23 @@ public class StartWindow extends JFrame {
             }
         });
         dialogPanel.add(connectButton);
-        dialogPanel.add(Box.createRigidArea(new Dimension(0, 15)));
+        dialogPanel.add(Box.createRigidArea(new Dimension(0, 12)));
+
+        forgotPasswordLinkLabel = new JLabel("¿Olvidaste tu contraseña?");
+        forgotPasswordLinkLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        forgotPasswordLinkLabel.setForeground(new Color(0, 123, 255));
+        forgotPasswordLinkLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        forgotPasswordLinkLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        forgotPasswordLinkLabel.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (onForgotPasswordListener != null) {
+                    onForgotPasswordListener.onForgotPasswordClicked();
+                }
+            }
+        });
+        dialogPanel.add(forgotPasswordLinkLabel);
+        dialogPanel.add(Box.createRigidArea(new Dimension(0, 12)));
 
         // Enlace "¿No tienes cuenta? Registrarse"
         registerLinkLabel = new JLabel("¿No tienes cuenta? Registrarse");
@@ -234,6 +256,26 @@ public class StartWindow extends JFrame {
 
     public void setOnRegisterLinkListener(OnRegisterLinkListener listener) {
         this.onRegisterLinkListener = listener;
+    }
+
+    public void setOnForgotPasswordListener(OnForgotPasswordListener listener) {
+        this.onForgotPasswordListener = listener;
+    }
+
+    public String getEnteredServerIp() {
+        String ip = serverIpField.getText().trim();
+        if (ip.isEmpty() || ip.equals("ej. 192.168.1.100")) {
+            return "";
+        }
+        return ip;
+    }
+
+    public String getEnteredUsername() {
+        String user = usernameField.getText().trim();
+        if (user.isEmpty() || user.equals("ej. mi_usuario")) {
+            return "";
+        }
+        return user;
     }
 
     public void clearFields() {

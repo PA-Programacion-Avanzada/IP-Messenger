@@ -1,202 +1,577 @@
 // Punto de entrada del cliente
 
+
+
+import core.Client;
+
+import core.SessionData;
+
+import network.Protocol;
+
 import ui.*;
+
+
+
 import javax.swing.*;
 
-/**
- * MainLauncher - Punto de entrada principal de la aplicación.
- * No es una interfaz gráfica, solo orquesta la creación y transición
- * entre las diferentes ventanas modales y principales.
- * 
- * Para integrar con la lógica de negocio, reemplazar los métodos dummy
- * con llamadas reales a los controladores/servicios.
- */
+import java.io.IOException;
+
+import java.time.LocalTime;
+
+import java.time.format.DateTimeFormatter;
+
+import java.util.ArrayList;
+
+import java.util.HashMap;
+
+import java.util.List;
+
+import java.util.Map;
+
+
+
 public class Main {
 
+
+
+    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+
+
+
     private StartWindow startWindow;
+
     private DashboardWindow dashboardWindow;
-    private ChatModal chatModal;
+
+    private Client client;
+
+    private SessionData session;
+
+    private final Map<Integer, String> userNamesById = new HashMap<>();
+
+    private final Map<Integer, DashboardWindow.FriendConversation> conversationsByUserId = new HashMap<>();
+
+
 
     public static void main(String[] args) {
+
         SwingUtilities.invokeLater(() -> new Main().start());
+
     }
+
+
 
     private void start() {
-        // Mostrar ventana de inicio de sesión
+
         showStartWindow();
+
     }
+
+
 
     private void showStartWindow() {
+
         startWindow = new StartWindow();
+
         startWindow.setOnConnectListener(this::onLoginAttempt);
+
         startWindow.setOnRegisterLinkListener(this::onRegisterLinkClicked);
+
+        startWindow.setOnForgotPasswordListener(this::onForgotPasswordClicked);
+
         startWindow.setVisible(true);
+
     }
+
+
 
     private void onLoginAttempt(String serverIp, String username, String password) {
-        // TODO: Llamar al controlador de autenticación real
-        // Por ahora, simulación: si campos no vacíos, login exitoso
+
         if (serverIp.isEmpty() || username.isEmpty() || password.isEmpty()) {
+
             startWindow.showError("Por favor completa todos los campos");
+
             return;
+
         }
 
-        // Simular validación (en un caso real, se haría una llamada asíncrona)
-        boolean success = true; // Aquí vendría la comprobación real
 
-        if (success) {
+
+        Client loginClient = new Client();
+
+        try {
+
+            SessionData loginSession = loginClient.login(serverIp, username, password);
+
+            loginClient.setMessageListener(message -> handleServerMessage(loginClient, message));
+
+            this.client = loginClient;
+
+            this.session = loginSession;
+
             startWindow.dispose();
-            showDashboardWindow(username);
-        } else {
-            startWindow.showError("Credenciales incorrectas o servidor no disponible");
+
+            showDashboardWindow(serverIp);
+
+        } catch (IOException ex) {
+
+            startWindow.showError("No se pudo conectar al servidor: " + ex.getMessage());
+
+            closeClientQuietly(loginClient);
+
         }
+
     }
+
+
 
     private void onRegisterLinkClicked() {
+
         RegisterModal registerModal = new RegisterModal(startWindow);
+
         registerModal.setOnRegisterListener((ip, user, pass) -> {
-            // TODO: Llamar al servicio de registro
+
             if (ip.isEmpty() || user.isEmpty() || pass.isEmpty()) {
+
                 registerModal.showError("Todos los campos son obligatorios");
+
                 return;
+
             }
-            // Simular registro exitoso
-            JOptionPane.showMessageDialog(registerModal,
-                    "Registro exitoso. Ahora puedes iniciar sesión.",
-                    "Éxito", JOptionPane.INFORMATION_MESSAGE);
-            registerModal.dispose();
-            // Regresar a la ventana de inicio (ya está abierta)
-            startWindow.clearFields();
-            startWindow.setVisible(true);
-        });
-        registerModal.setOnCancelListener(() -> {
-            registerModal.dispose();
-            startWindow.setVisible(true);
-        });
-        registerModal.setOnSwitchToLoginListener(() -> {
-            registerModal.dispose();
-            startWindow.setVisible(true);
-        });
-        // Ocultar la ventana de inicio mientras se muestra el registro
-        startWindow.setVisible(false);
-        registerModal.setVisible(true);
-    }
 
-    private void onRecoverAccountLinkClicked() {
-        RecoverAccountModal recoverModal = new RecoverAccountModal(startWindow);
-        recoverModal.setOnResetListener((ip, user, newPass) -> {
-            // TODO: Llamar al servicio de recuperación de contraseña
-            if (ip.isEmpty() || user.isEmpty() || newPass.isEmpty()) {
-                recoverModal.showError("Complete todos los campos");
-                return;
-            }
-            recoverModal.showSuccess("Contraseña restablecida. Ahora puede iniciar sesión.");
-            recoverModal.dispose();
-            startWindow.setVisible(true);
-        });
-        recoverModal.setOnCancelListener(() -> {
-            recoverModal.dispose();
-            startWindow.setVisible(true);
-        });
-        recoverModal.setOnCreateAccountListener(() -> {
-            recoverModal.dispose();
-            onRegisterLinkClicked(); // Reutilizar registro
-        });
-        startWindow.setVisible(false);
-        recoverModal.setVisible(true);
-    }
 
-    private void showDashboardWindow(String username) {
-        dashboardWindow = new DashboardWindow();
-        dashboardWindow.setTitle("IP Messenger - " + username);
 
-        // Cargar datos simulados (en producción vendrían de la capa de negocio)
-        loadDummyDataIntoDashboard();
+            Client registerClient = new Client();
 
-        // Configurar listeners del Dashboard
-        dashboardWindow.setOnFriendChatSelectedListener(conversation -> {
-            // Abrir ventana de chat con el amigo seleccionado
-            FriendRequestModal chatModal = new FriendRequestModal(dashboardWindow, conversation.getName());
-            chatModal.setOnSendFriendMessageListener((recipient, message) -> {
-                // TODO: Enviar mensaje a través del controlador
-                System.out.println("Mensaje para " + recipient + ": " + message);
-                JOptionPane.showMessageDialog(chatModal, "Mensaje enviado a " + recipient);
-                chatModal.dispose();
-            });
-            chatModal.setOnCancelListener(chatModal::dispose);
-            chatModal.setVisible(true);
-        });
+            try {
 
-        dashboardWindow.setOnGroupSelectedListener(group -> {
-            GroupInviteModal groupModal = new GroupInviteModal(dashboardWindow, group.getName());
-            groupModal.setOnSendGroupMessageListener((grpName, message) -> {
-                System.out.println("Mensaje al grupo " + grpName + ": " + message);
-                JOptionPane.showMessageDialog(groupModal, "Mensaje enviado al grupo");
-                groupModal.dispose();
-            });
-            groupModal.setOnCancelListener(groupModal::dispose);
-            groupModal.setVisible(true);
-        });
+                Map<String, Object> response = registerClient.register(ip, user, pass);
 
-        dashboardWindow.setOnUserActionListener(user -> {
-            // Acción al hacer clic en el botón "+" de un usuario: enviar invitación o mensaje temporal
-            int option = JOptionPane.showConfirmDialog(dashboardWindow,
-                    "¿Enviar mensaje temporal a " + user.getName() + "?",
-                    "Mensaje temporal",
-                    JOptionPane.YES_NO_OPTION);
-            if (option == JOptionPane.YES_OPTION) {
-                String msg = JOptionPane.showInputDialog(dashboardWindow, "Mensaje:");
-                if (msg != null && !msg.trim().isEmpty()) {
-                    System.out.println("Mensaje temporal a " + user.getName() + ": " + msg);
-                    JOptionPane.showMessageDialog(dashboardWindow, "Mensaje temporal enviado (no se guarda)");
+                String status = String.valueOf(response.get("status"));
+
+                if (Protocol.RES_OK.equals(status)) {
+
+                    String message = String.valueOf(response.getOrDefault("message", "Registro exitoso."));
+
+                    JOptionPane.showMessageDialog(registerModal, message, "Éxito", JOptionPane.INFORMATION_MESSAGE);
+
+                    registerModal.dispose();
+
+                    startWindow.clearFields();
+
+                    startWindow.setVisible(true);
+
+                } else {
+
+                    registerModal.showError(String.valueOf(response.getOrDefault("message", "No se pudo registrar el usuario")));
+
                 }
+
+            } catch (IOException ex) {
+
+                registerModal.showError("No se pudo conectar al servidor: " + ex.getMessage());
+
+            } finally {
+
+                closeClientQuietly(registerClient);
+
             }
+
         });
 
-        dashboardWindow.setOnInvitationActionListener(new DashboardWindow.OnInvitationActionListener() {
-            @Override
-            public void onAccept(DashboardWindow.GroupInvitation invitation) {
-                // TODO: Aceptar invitación a grupo
-                JOptionPane.showMessageDialog(dashboardWindow,
-                        "Te uniste al grupo " + invitation.getGroupName());
-                // Refrescar lista de grupos
+        registerModal.setOnCancelListener(() -> {
+
+            registerModal.dispose();
+
+            startWindow.setVisible(true);
+
+        });
+
+        registerModal.setOnSwitchToLoginListener(() -> {
+
+            registerModal.dispose();
+
+            startWindow.setVisible(true);
+
+        });
+
+        startWindow.setVisible(false);
+
+        registerModal.setVisible(true);
+
+    }
+
+
+
+    private void onForgotPasswordClicked() {
+
+        RecoverAccountModal recoverModal = new RecoverAccountModal(startWindow);
+
+        recoverModal.prefill(startWindow.getEnteredServerIp(), startWindow.getEnteredUsername());
+
+        recoverModal.setOnResetListener((ip, user, newPass) -> {
+
+            if (ip.isEmpty() || user.isEmpty() || newPass.isEmpty()) {
+
+                recoverModal.showError("Complete todos los campos");
+
+                return;
+
             }
 
-            @Override
-            public void onReject(DashboardWindow.GroupInvitation invitation) {
-                // TODO: Rechazar invitación
-                JOptionPane.showMessageDialog(dashboardWindow,
-                        "Rechazaste la invitación al grupo " + invitation.getGroupName());
+
+
+            Client recoverClient = new Client();
+
+            try {
+
+                Map<String, Object> response = recoverClient.recoverPassword(ip, user, newPass);
+
+                String status = String.valueOf(response.get("status"));
+
+                if (Protocol.RES_OK.equals(status)) {
+
+                    recoverModal.showSuccess(String.valueOf(response.getOrDefault("message", "Contraseña restablecida.")));
+
+                    recoverModal.dispose();
+
+                    startWindow.clearFields();
+
+                    startWindow.setVisible(true);
+
+                } else {
+
+                    recoverModal.showError(String.valueOf(response.getOrDefault("message", "No se pudo restablecer la contraseña")));
+
+                }
+
+            } catch (IOException ex) {
+
+                recoverModal.showError("No se pudo conectar al servidor: " + ex.getMessage());
+
+            } finally {
+
+                closeClientQuietly(recoverClient);
+
             }
+
         });
+
+        recoverModal.setOnCancelListener(() -> {
+
+            recoverModal.dispose();
+
+            startWindow.setVisible(true);
+
+        });
+
+        recoverModal.setOnCreateAccountListener(() -> {
+
+            recoverModal.dispose();
+
+            onRegisterLinkClicked();
+
+        });
+
+        startWindow.setVisible(false);
+
+        recoverModal.setVisible(true);
+
+    }
+
+
+
+    private void showDashboardWindow(String serverIp) {
+
+        dashboardWindow = new DashboardWindow();
+
+        dashboardWindow.setTitle("IP Messenger - " + session.getUsername() + " (" + serverIp + ")");
+
+        refreshDashboardData(session);
+
+
+
+        dashboardWindow.setOnFriendChatSelectedListener(conversation -> openChatWithUser(conversation.getFriendId(), conversation.getName()));
+
+
+
+        dashboardWindow.setOnUserActionListener(user -> openChatWithUser(user.getUserId(), user.getName()));
+
+
+
+        dashboardWindow.setOnSendTemporaryMessageListener((message, targetUser) -> {
+
+            try {
+
+                Map<String, Object> response = client.sendGeneralMessage(message);
+
+                if (!Protocol.RES_OK.equals(String.valueOf(response.get("status")))) {
+
+                    JOptionPane.showMessageDialog(dashboardWindow,
+
+                            response.getOrDefault("message", "No se pudo enviar el mensaje general"));
+
+                }
+
+            } catch (IOException ex) {
+
+                JOptionPane.showMessageDialog(dashboardWindow, "Error de conexión: " + ex.getMessage());
+
+            }
+
+        });
+
+
+
+        dashboardWindow.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+
+        dashboardWindow.addWindowListener(new java.awt.event.WindowAdapter() {
+
+            @Override
+
+            public void windowClosing(java.awt.event.WindowEvent e) {
+
+                closeClientQuietly(client);
+
+            }
+
+        });
+
+
 
         dashboardWindow.setVisible(true);
+
     }
 
-    private void loadDummyDataIntoDashboard() {
-        // Datos de ejemplo para visualización
-        java.util.List<DashboardWindow.FriendConversation> friends = new java.util.ArrayList<>();
-        friends.add(new DashboardWindow.FriendConversation("Juan Pérez", "¿Nos vemos mañana?", "10:45", true, true, 1));
-        friends.add(new DashboardWindow.FriendConversation("María García", "Perfecto, gracias", "10:30", true, true, 2));
-        friends.add(new DashboardWindow.FriendConversation("Carlos López", "Te enviaré el archivo", "09:15", false, false, 3));
-        dashboardWindow.setFriendConversations(friends);
 
-        java.util.List<DashboardWindow.GroupItem> groups = new java.util.ArrayList<>();
-        groups.add(new DashboardWindow.GroupItem("Estudio Java", 5, true, 101));
-        groups.add(new DashboardWindow.GroupItem("Desarrollo Web", 8, false, 102));
-        groups.add(new DashboardWindow.GroupItem("Proyecto Final", 6, true, 103));
-        dashboardWindow.setGroups(groups);
 
-        java.util.List<DashboardWindow.UserItem> users = new java.util.ArrayList<>();
-        users.add(new DashboardWindow.UserItem("Pedro Díaz", true, 201));
-        users.add(new DashboardWindow.UserItem("Valentina Ruiz", true, 202));
-        users.add(new DashboardWindow.UserItem("Mateo Salazar", false, 203));
-        users.add(new DashboardWindow.UserItem("Camila Ortega", true, 204));
+    private void openChatWithUser(int userId, String username) {
+
+        FriendRequestModal chatModal = new FriendRequestModal(dashboardWindow, username);
+
+        chatModal.setOnSendFriendMessageListener((recipient, message) -> {
+
+            try {
+
+                Map<String, Object> response = client.sendFriendMessage(userId, message);
+
+                if (Protocol.RES_OK.equals(String.valueOf(response.get("status")))) {
+
+                    updateConversation(userId, username, message, false);
+
+                    chatModal.dispose();
+
+                } else {
+
+                    JOptionPane.showMessageDialog(chatModal,
+
+                            String.valueOf(response.getOrDefault("message", "No se pudo enviar el mensaje")));
+
+                }
+
+            } catch (IOException ex) {
+
+                JOptionPane.showMessageDialog(chatModal, "Error de conexión: " + ex.getMessage());
+
+            }
+
+        });
+
+        chatModal.setOnCancelListener(chatModal::dispose);
+
+        chatModal.setVisible(true);
+
+    }
+
+
+
+    private void handleServerMessage(Client activeClient, Map<String, Object> message) {
+
+        if (activeClient != client) {
+
+            return;
+
+        }
+
+        SwingUtilities.invokeLater(() -> processServerMessage(message));
+
+    }
+
+
+
+    private void processServerMessage(Map<String, Object> message) {
+
+        String status = String.valueOf(message.get("status"));
+
+        if (Protocol.RES_NEW_MESSAGE.equals(status)) {
+
+            handleIncomingMessage(message);
+
+        } else if (Protocol.RES_USER_LIST.equals(status)) {
+
+            SessionData updated = new SessionData();
+
+            updated.absorb(message);
+
+            refreshDashboardData(updated);
+
+        }
+
+    }
+
+
+
+    private void handleIncomingMessage(Map<String, Object> message) {
+
+        String type = String.valueOf(message.getOrDefault("type", "friend"));
+
+        String content = String.valueOf(message.get("content"));
+
+        int senderId = ((Number) message.get("senderId")).intValue();
+
+        String senderName = String.valueOf(message.getOrDefault("senderUsername", userNamesById.getOrDefault(senderId, "Usuario " + senderId)));
+
+
+
+        if ("general".equals(type)) {
+
+            JOptionPane.showMessageDialog(dashboardWindow,
+
+                    senderName + " (chat general): " + content,
+
+                    "Mensaje general",
+
+                    JOptionPane.INFORMATION_MESSAGE);
+
+            return;
+
+        }
+
+
+
+        updateConversation(senderId, senderName, content, true);
+
+        JOptionPane.showMessageDialog(dashboardWindow,
+
+                senderName + ": " + content,
+
+                "Nuevo mensaje",
+
+                JOptionPane.INFORMATION_MESSAGE);
+
+    }
+
+
+
+    private void updateConversation(int userId, String username, String lastMessage, boolean unread) {
+
+        userNamesById.put(userId, username);
+
+        DashboardWindow.FriendConversation conversation = new DashboardWindow.FriendConversation(
+
+                username,
+
+                lastMessage,
+
+                LocalTime.now().format(TIME_FORMAT),
+
+                unread,
+
+                true,
+
+                userId
+
+        );
+
+        conversationsByUserId.put(userId, conversation);
+
+        dashboardWindow.setFriendConversations(new ArrayList<>(conversationsByUserId.values()));
+
+    }
+
+
+
+    private void refreshDashboardData(SessionData data) {
+
+        for (Map<String, Object> user : data.getUsers()) {
+
+            userNamesById.put(((Number) user.get("id")).intValue(), String.valueOf(user.get("username")));
+
+        }
+
+
+
+        List<DashboardWindow.UserItem> users = new ArrayList<>();
+
+        for (Map<String, Object> user : data.getUsers()) {
+
+            users.add(new DashboardWindow.UserItem(
+
+                    String.valueOf(user.get("username")),
+
+                    Boolean.TRUE.equals(user.get("online")),
+
+                    ((Number) user.get("id")).intValue()
+
+            ));
+
+        }
+
         dashboardWindow.setAllUsers(users);
 
-        java.util.List<DashboardWindow.GroupInvitation> invitations = new java.util.ArrayList<>();
-        invitations.add(new DashboardWindow.GroupInvitation("Luis Contreras", "Proyecto Final", 103, 301));
-        invitations.add(new DashboardWindow.GroupInvitation("María Rodríguez", "Diseño UI/UX", 104, 302));
-        dashboardWindow.setInvitations(invitations);
+
+
+        List<DashboardWindow.GroupItem> groups = new ArrayList<>();
+
+        for (Map<String, Object> group : data.getGroups()) {
+
+            groups.add(new DashboardWindow.GroupItem(
+
+                    String.valueOf(group.get("name")),
+
+                    0,
+
+                    false,
+
+                    ((Number) group.get("id")).intValue()
+
+            ));
+
+        }
+
+        dashboardWindow.setGroups(groups);
+
+        dashboardWindow.setInvitations(new ArrayList<>());
+
+
+
+        if (conversationsByUserId.isEmpty()) {
+
+            dashboardWindow.setFriendConversations(new ArrayList<>());
+
+        }
+
     }
+
+
+
+    private void closeClientQuietly(Client activeClient) {
+
+        if (activeClient == null) {
+
+            return;
+
+        }
+
+        try {
+
+            activeClient.close();
+
+        } catch (IOException ignored) {
+
+        }
+
+    }
+
 }
+
+

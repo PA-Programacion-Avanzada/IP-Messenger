@@ -41,3 +41,11 @@ db.url=jdbc:sqlite:messenger.db
 ```
 
 La base de datos SQLite se crea automáticamente al iniciar el servidor.
+
+## Uso en hotspot / red local
+
+1. Ejecuta el servidor en la PC que comparte internet o hotspot.
+2. En la consola verás las IPs disponibles, por ejemplo: `192.168.137.1:12345`.
+3. En cada cliente usa esa IP en el campo **Servidor IP** (no uses `127.0.0.1` si el cliente está en otro equipo).
+4. Permite el puerto `12345` en el firewall de Windows si no conecta.
+5. Todos los usuarios registrados en esa red pueden iniciar sesión y chatear entre sí.

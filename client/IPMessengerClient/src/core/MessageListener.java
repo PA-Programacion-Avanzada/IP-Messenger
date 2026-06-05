@@ -1,7 +1,8 @@
-// Hilo que escucha los mensajes entrantes del servidor
 package core;
 
+import java.util.Map;
 
-public class MessageListener {
-    
+@FunctionalInterface
+public interface MessageListener {
+    void onMessage(Map<String, Object> message);
 }

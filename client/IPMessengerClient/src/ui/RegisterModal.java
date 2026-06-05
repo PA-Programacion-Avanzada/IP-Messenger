@@ -40,9 +40,17 @@ public class RegisterModal extends JDialog {
     public RegisterModal(Frame owner) {
         super(owner, "Registro de Cuenta", true);
         initUI();
-        setSize(480, 420);
+        setMinimumSize(new Dimension(500, 540));
+        setSize(500, 540);
         setLocationRelativeTo(owner);
-        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        setResizable(false);
+        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                closeDialog();
+            }
+        });
     }
 
     private void initUI() {
@@ -82,7 +90,7 @@ public class RegisterModal extends JDialog {
         closeButton.setContentAreaFilled(false);
         closeButton.setBorderPainted(false);
         closeButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        closeButton.addActionListener(e -> dispose());
+        closeButton.addActionListener(e -> closeDialog());
         header.add(closeButton, BorderLayout.EAST);
 
         return header;
@@ -117,7 +125,7 @@ public class RegisterModal extends JDialog {
         ));
         passwordField.setEchoChar('•');
         formPanel.add(createFieldRow("Contraseña:", passwordField));
-        formPanel.add(Box.createRigidArea(new Dimension(0, 30)));
+        formPanel.add(Box.createRigidArea(new Dimension(0, 20)));
 
         // Botones
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
@@ -152,10 +160,7 @@ public class RegisterModal extends JDialog {
                 BorderFactory.createEmptyBorder(9, 24, 9, 24)
         ));
         cancelButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        cancelButton.addActionListener(e -> {
-            if (onCancelListener != null) onCancelListener.onCancel();
-            else dispose();
-        });
+        cancelButton.addActionListener(e -> closeDialog());
 
         buttonPanel.add(enterButton);
         buttonPanel.add(cancelButton);
@@ -167,7 +172,7 @@ public class RegisterModal extends JDialog {
     private JPanel createFooterPanel() {
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
         footer.setBackground(Color.WHITE);
-        footer.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
+        footer.setBorder(BorderFactory.createEmptyBorder(12, 0, 4, 0));
 
         loginLinkLabel = new JLabel("¿Ya tienes cuenta? Inicia sesión aquí");
         loginLinkLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
@@ -220,6 +225,14 @@ public class RegisterModal extends JDialog {
         row.add(label, BorderLayout.WEST);
         row.add(field, BorderLayout.CENTER);
         return row;
+    }
+
+    private void closeDialog() {
+        if (onCancelListener != null) {
+            onCancelListener.onCancel();
+        } else {
+            dispose();
+        }
     }
 
     // Métodos públicos para establecer listeners

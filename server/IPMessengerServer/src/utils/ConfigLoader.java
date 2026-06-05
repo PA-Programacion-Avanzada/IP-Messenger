@@ -11,6 +11,7 @@ public class ConfigLoader {
             if (input == null) {
                 // Valores por defecto
                 props.setProperty("server.port", "12345");
+                props.setProperty("server.bind", "0.0.0.0");
                 props.setProperty("db.url", "jdbc:sqlite:messenger.db");
             } else {
                 props.load(input);

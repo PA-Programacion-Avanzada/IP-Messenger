@@ -336,9 +336,10 @@ public class DashboardWindow extends JFrame {
         tempMsgBtn.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
         tempMsgBtn.addActionListener(e -> {
             // Se puede abrir un diálogo para escribir mensaje temporal
-            // Por simplicidad se lanza un evento
-            // O se puede preguntar al usuario seleccionado
-            JOptionPane.showMessageDialog(this, "Funcionalidad: mensaje temporal");
+            String message = JOptionPane.showInputDialog(this, "Mensaje para todos los usuarios conectados:");
+            if (message != null && !message.trim().isEmpty() && onSendTemporaryMessageListener != null) {
+                onSendTemporaryMessageListener.onSendTemporaryMessage(message.trim(), null);
+            }
         });
         panel.add(tempMsgBtn, BorderLayout.SOUTH);
 

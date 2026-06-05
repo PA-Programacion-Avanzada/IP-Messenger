@@ -37,11 +37,19 @@ public class RecoverAccountModal extends JDialog {
     }
 
     public RecoverAccountModal(Frame owner) {
-        super(owner, "Recuperar cuenta", true);
+        super(owner, "Restablecer contraseña", true);
         initUI();
-        setSize(480, 460);
+        setMinimumSize(new Dimension(500, 540));
+        setSize(500, 540);
         setLocationRelativeTo(owner);
-        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        setResizable(false);
+        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                closeDialog();
+            }
+        });
     }
 
     private void initUI() {
@@ -70,7 +78,7 @@ public class RecoverAccountModal extends JDialog {
         header.setBackground(Color.WHITE);
         header.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
 
-        JLabel titleLabel = new JLabel("Recuperar cuenta");
+        JLabel titleLabel = new JLabel("¿Olvidaste tu contraseña?");
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
         header.add(titleLabel, BorderLayout.WEST);
 
@@ -80,7 +88,7 @@ public class RecoverAccountModal extends JDialog {
         closeButton.setContentAreaFilled(false);
         closeButton.setBorderPainted(false);
         closeButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        closeButton.addActionListener(e -> dispose());
+        closeButton.addActionListener(e -> closeDialog());
         header.add(closeButton, BorderLayout.EAST);
 
         return header;
@@ -92,7 +100,7 @@ public class RecoverAccountModal extends JDialog {
         formPanel.setBackground(Color.WHITE);
 
         // Texto descriptivo
-        JLabel description = new JLabel("Ingresa tu nombre de usuario y la nueva contraseña.");
+        JLabel description = new JLabel("<html>Ingresa el servidor, tu usuario y la nueva contraseña.<br>Se actualizará directamente en el servidor.</html>");
         description.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         description.setForeground(new Color(80, 80, 80));
         description.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -162,10 +170,7 @@ public class RecoverAccountModal extends JDialog {
         cancelButton.setBorder(BorderFactory.createEmptyBorder(8, 20, 8, 20));
         cancelButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         cancelButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        cancelButton.addActionListener(e -> {
-            if (onCancelListener != null) onCancelListener.onCancel();
-            else dispose();
-        });
+        cancelButton.addActionListener(e -> closeDialog());
         formPanel.add(cancelButton);
 
         return formPanel;
@@ -244,6 +249,25 @@ public class RecoverAccountModal extends JDialog {
         @Override
         public Insets getBorderInsets(Component c) {
             return new Insets(5, 5, 5, 5);
+        }
+    }
+
+    public void prefill(String serverIp, String username) {
+        if (serverIp != null && !serverIp.isEmpty()) {
+            serverIpField.setText(serverIp);
+            serverIpField.setForeground(Color.BLACK);
+        }
+        if (username != null && !username.isEmpty()) {
+            usernameField.setText(username);
+            usernameField.setForeground(Color.BLACK);
+        }
+    }
+
+    private void closeDialog() {
+        if (onCancelListener != null) {
+            onCancelListener.onCancel();
+        } else {
+            dispose();
         }
     }
 

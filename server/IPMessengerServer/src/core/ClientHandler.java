@@ -92,6 +92,9 @@ public class ClientHandler implements Runnable {
                     case Protocol.CMD_GET_PENDING_MSGS:
                         handleGetPendingMsgs();
                         break;
+                    case Protocol.CMD_SEND_TEMP_MSG:
+                        handleSendTempMsg(data);
+                        break;
                     case Protocol.CMD_CREATE_GROUP:
                         handleCreateGroup(data);
                         break;
@@ -133,6 +136,7 @@ public class ClientHandler implements Runnable {
             sendGroupList();
             sendAllUsers();
             sendPendingMessages();
+            scheduleUserListBroadcast();
         } else {
             loginAttempts++;
             Map<String, Object> response = new HashMap<>();
@@ -199,9 +203,36 @@ public class ClientHandler implements Runnable {
     }
 
     private List<Map<String, Object>> getAllUsersExcept(int userId) throws SQLException {
-        // Implementar con UserDAO: findAllExcept
-        // Por brevedad, lo dejamos como ejercicio. Puedes crear un método en UserDAO.
-        return new java.util.ArrayList<>();
+        List<User> users = new UserDAO().findAllExcept(userId);
+        List<Map<String, Object>> result = new java.util.ArrayList<>();
+        synchronized (connectedClients) {
+            for (User user : users) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("id", user.getId());
+                map.put("username", user.getUsername());
+                map.put("online", connectedClients.containsKey(user.getUsername()));
+                result.add(map);
+            }
+        }
+        return result;
+    }
+
+    private void scheduleUserListBroadcast() {
+        ThreadPoolManager.execute(this::broadcastUserList);
+    }
+
+    private void broadcastUserList() {
+        synchronized (connectedClients) {
+            for (ClientHandler handler : connectedClients.values()) {
+                if (handler != this && handler.currentUser != null) {
+                    try {
+                        handler.sendAllUsers();
+                    } catch (Exception e) {
+                        Logger.log("No se pudo actualizar la lista de usuarios: " + e.getMessage());
+                    }
+                }
+            }
+        }
     }
 
     private void sendFriendList() throws SQLException, IOException {
@@ -275,6 +306,7 @@ public class ClientHandler implements Runnable {
             Map<String, Object> newMsg = new HashMap<>();
             newMsg.put("status", Protocol.RES_NEW_MESSAGE);
             newMsg.put("senderId", currentUser.getId());
+            newMsg.put("senderUsername", currentUser.getUsername());
             newMsg.put("content", content);
             newMsg.put("type", "friend");
             friendHandler.sendMessage(newMsg);
@@ -283,6 +315,30 @@ public class ClientHandler implements Runnable {
         response.put("status", Protocol.RES_OK);
         response.put("message", "Mensaje enviado");
         sendMessage(response);
+    }
+
+    private void handleSendTempMsg(Map<String, Object> data) throws IOException {
+        String content = (String) data.get("content");
+        if (content == null || content.trim().isEmpty()) {
+            sendError("El mensaje general no puede estar vacío");
+            return;
+        }
+
+        Map<String, Object> newMsg = new HashMap<>();
+        newMsg.put("status", Protocol.RES_NEW_MESSAGE);
+        newMsg.put("senderId", currentUser.getId());
+        newMsg.put("senderUsername", currentUser.getUsername());
+        newMsg.put("content", content);
+        newMsg.put("type", "general");
+
+        synchronized (connectedClients) {
+            for (ClientHandler handler : connectedClients.values()) {
+                if (handler != this) {
+                    handler.sendMessage(newMsg);
+                }
+            }
+        }
+        sendOk();
     }
 
     private void handleSendGroupMsg(Map<String, Object> data) throws SQLException, IOException {
@@ -335,7 +391,7 @@ public class ClientHandler implements Runnable {
         sendOk();
     }
 
-    private void sendMessage(Map<String, Object> message) throws IOException {
+    private synchronized void sendMessage(Map<String, Object> message) throws IOException {
         String json = JSONParser.toJson(message);
         byte[] data = json.getBytes("UTF-8");
         byte[] compressed = LZ77Compressor.compress(data);
@@ -377,6 +433,7 @@ public class ClientHandler implements Runnable {
                 synchronized (connectedClients) {
                     connectedClients.remove(currentUser.getUsername());
                 }
+                scheduleUserListBroadcast();
             }
             if (socket != null && !socket.isClosed()) socket.close();
         } catch (Exception e) {

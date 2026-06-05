@@ -2,6 +2,8 @@ package database;
 
 import models.User;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class UserDAO {
 
@@ -48,6 +50,25 @@ public class UserDAO {
             stmt.setInt(2, userId);
             return stmt.executeUpdate() > 0;
         }
+    }
+
+    public List<User> findAllExcept(int excludeId) throws SQLException {
+        List<User> users = new ArrayList<>();
+        String sql = "SELECT id, username, password, status, last_seen FROM Users WHERE id != ? ORDER BY username";
+        try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
+            stmt.setInt(1, excludeId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                users.add(new User(
+                        rs.getInt("id"),
+                        rs.getString("username"),
+                        rs.getString("password"),
+                        rs.getString("status"),
+                        rs.getTimestamp("last_seen")
+                ));
+            }
+        }
+        return users;
     }
 
     public User findById(int id) throws SQLException {
