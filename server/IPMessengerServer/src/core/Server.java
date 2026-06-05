@@ -1,7 +1,6 @@
 package core;
 
 import database.DatabaseManager;
-import database.DatabaseSchemaInitializer;
 import utils.ConfigLoader;
 import utils.Logger;
 
@@ -20,7 +19,7 @@ public class Server {
 
         try {
             DatabaseManager.connect(dbUrl);
-            DatabaseSchemaInitializer.initialize();
+            DatabaseManager.initializeDatabase();
             Logger.log("Base de datos conectada: " + dbUrl);
 
             ServerSocket serverSocket = new ServerSocket(port);
