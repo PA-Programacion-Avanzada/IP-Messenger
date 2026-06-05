@@ -1,6 +1,16 @@
-// Serialización/deserialización de JSON
 package network;
 
+import google.gson.Gson;
+import google.gson.GsonBuilder;
+
 public class JSONParser {
-    
+    private static final Gson gson = new GsonBuilder().create();
+
+    public static String toJson(Object obj) {
+        return gson.toJson(obj);
+    }
+
+    public static <T> T fromJson(String json, Class<T> type) {
+        return gson.fromJson(json, type);
+    }
 }

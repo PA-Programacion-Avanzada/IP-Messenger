@@ -1,17 +1,12 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package models;
 
-/**
- *
- * @author jos20
- */
+import java.sql.Timestamp;
+
 public class Group {
     private int id;
     private String name;
     private int creatorId;
+<<<<<<< HEAD
 
     public Group() {
     }
@@ -46,3 +41,9 @@ public class Group {
         this.creatorId = creatorId;
     }
 }
+=======
+    private Timestamp createdAt;
+
+    // constructores, getters, setters
+}
+>>>>>>> 7882dce65d1052a24e564685c9b36b9aca0a72b2
