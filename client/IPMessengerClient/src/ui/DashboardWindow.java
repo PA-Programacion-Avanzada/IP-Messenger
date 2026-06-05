@@ -530,38 +530,61 @@ public class DashboardWindow extends JFrame {
     }
 
     private JPanel createUserRow(UserItem user) {
-        JPanel row = new JPanel(new BorderLayout(8, 0));
+        JPanel row = new JPanel();
+        row.setLayout(new BoxLayout(row, BoxLayout.X_AXIS));
         row.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
         row.setBackground(Color.WHITE);
 
+        // Avatar
         JLabel avatar = new JLabel(user.getName().substring(0, 1));
         avatar.setOpaque(true);
         avatar.setBackground(new Color(70, 130, 180));
         avatar.setForeground(Color.WHITE);
         avatar.setHorizontalAlignment(SwingConstants.CENTER);
+        avatar.setMaximumSize(new Dimension(36, 36));
         avatar.setPreferredSize(new Dimension(36, 36));
-        row.add(avatar, BorderLayout.WEST);
+        row.add(avatar);
 
-        JPanel textPanel = new JPanel(new GridLayout(2, 1));
+        row.add(Box.createRigidArea(new Dimension(10, 0)));
+
+        // Texto (nombre + estado)
+        JPanel textPanel = new JPanel();
+        textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
         textPanel.setOpaque(false);
+
         JLabel nameLabel = new JLabel(user.getName());
         nameLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+
         JLabel statusLabel = new JLabel(user.isOnline() ? "● En línea" : "○ Desconectado");
         statusLabel.setForeground(user.isOnline() ? new Color(40, 167, 69) : Color.GRAY);
         statusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+
         textPanel.add(nameLabel);
         textPanel.add(statusLabel);
-        row.add(textPanel, BorderLayout.CENTER);
+        row.add(textPanel);
+        row.add(Box.createHorizontalGlue());
 
+        // Botón “+” – ahora con ancho fijo mayor
         JButton actionBtn = new JButton("+");
-        actionBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        actionBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
         actionBtn.setFocusPainted(false);
         actionBtn.setBackground(new Color(255, 140, 0));
         actionBtn.setForeground(Color.WHITE);
+
+        // Tamaño fijo de 40×40
+        Dimension btnSize = new Dimension(40, 40);
+        actionBtn.setMinimumSize(btnSize);
+        actionBtn.setPreferredSize(btnSize);
+        actionBtn.setMaximumSize(btnSize);
+        actionBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+
         actionBtn.addActionListener(e -> {
             if (onUserActionListener != null) onUserActionListener.onUserAction(user);
         });
-        row.add(actionBtn, BorderLayout.EAST);
+        row.add(actionBtn);
+
+        // Evita que la fila se estire verticalmente
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
 
         return row;
     }
