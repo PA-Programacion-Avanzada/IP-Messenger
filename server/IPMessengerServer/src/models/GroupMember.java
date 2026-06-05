@@ -2,7 +2,7 @@ package models;
 
 import java.sql.Timestamp;
 
-public class Group {
+public class GroupMember {
     private int id;
     private String name;
     private int creatorId;

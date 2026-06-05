@@ -3,3 +3,8 @@
 /client/IPMessengerClient/build/
 /client/WEB/nbproject/private/
 /client/WEB/build/
+/server/IPMessengerServer/build/
+**/nbproject/
+server/IPMessengerServer/nbproject/
+client/IPMessengerClient/nbproject/
+client/WEB/nbproject/

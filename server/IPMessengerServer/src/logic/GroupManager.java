@@ -1,6 +1,79 @@
-// Creación, eliminación, invitación a grupos
 package logic;
 
+import database.GroupDAO;
+import database.GroupMemberDAO;
+import database.UserDAO;
+import models.Group;
+import models.User;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
 public class GroupManager {
-    
+    private GroupDAO groupDAO = new GroupDAO();
+    private GroupMemberDAO memberDAO = new GroupMemberDAO();
+    private UserDAO userDAO = new UserDAO();
+
+    public int createGroup(String name, int creatorId, List<Integer> invitedUserIds) throws SQLException {
+        // Se necesita al menos 2 invitados para que junto al creador sumen 3
+        if (invitedUserIds.size() < 2) return -1;
+        int groupId = groupDAO.createGroup(name, creatorId);
+        if (groupId == -1) return -1;
+        // El creador se agrega como accepted
+        memberDAO.inviteMember(groupId, creatorId);
+        memberDAO.updateStatus(groupId, creatorId, "accepted");
+        // Invitar a los demás
+        for (int uid : invitedUserIds) {
+            memberDAO.inviteMember(groupId, uid);
+        }
+        return groupId;
+    }
+
+    public void acceptInvitation(int groupId, int userId) throws SQLException {
+        memberDAO.updateStatus(groupId, userId, "accepted");
+        // Verificar si después de esta aceptación el grupo tiene al menos 3 miembros activos
+        int activeCount = memberDAO.countAcceptedMembers(groupId);
+        if (activeCount >= 3) {
+            // El grupo se activa (puedes notificar a los miembros, o simplemente dejar que funcione)
+            // No se requiere acción extra.
+        }
+    }
+
+    public void rejectInvitation(int groupId, int userId) throws SQLException {
+        memberDAO.updateStatus(groupId, userId, "rejected");
+        // Verificar si después del rechazo el grupo se queda con menos de 3 miembros activos
+        int activeCount = memberDAO.countAcceptedMembers(groupId);
+        if (activeCount < 3) {
+            // Eliminar el grupo
+            groupDAO.deleteGroup(groupId);
+        }
+    }
+
+    public void leaveGroup(int groupId, int userId) throws SQLException {
+        memberDAO.deleteMember(groupId, userId);
+        int activeCount = memberDAO.countAcceptedMembers(groupId);
+        if (activeCount < 3) {
+            groupDAO.deleteGroup(groupId);
+        }
+    }
+
+    public List<Group> getGroupsForUser(int userId) throws SQLException {
+        // Obtener grupos donde el usuario tiene status 'accepted' (o también 'invited'?)
+        // Simplificado: buscamos en GroupMembers los grupos donde user_id = userId y status = 'accepted'
+        // Luego cargamos el Group desde GroupDAO
+        // Como no tenemos método directo, hacemos consulta manual en GroupMemberDAO
+        // Añadiremos un método en GroupMemberDAO: getGroupsByUser(userId, status)
+        // Por ahora dejamos placeholder
+        return new ArrayList<>();
+    }
+
+    public List<User> getGroupMembers(int groupId) throws SQLException {
+        List<Integer> memberIds = memberDAO.getAcceptedMemberIds(groupId);
+        List<User> members = new ArrayList<>();
+        for (int id : memberIds) {
+            User u = userDAO.findById(id);
+            if (u != null) members.add(u);
+        }
+        return members;
+    }
 }
