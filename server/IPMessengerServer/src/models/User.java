@@ -5,17 +5,19 @@ import java.sql.Timestamp;
 public class User {
     private int id;
     private String username;
-    private String password;
+    private String passwordHash;
     private String status;
+    private Timestamp lastSeen;
 
-    public User(int aInt, String string, String string1, String string2, Timestamp timestamp) {
+    public User() {
     }
 
-    public User(int id, String username, String password, String status) {
+    public User(int id, String username, String passwordHash, String status, Timestamp lastSeen) {
         this.id = id;
         this.username = username;
-        this.password = password;
+        this.passwordHash = passwordHash;
         this.status = status;
+        this.lastSeen = lastSeen;
     }
 
     public int getId() {
@@ -34,12 +36,12 @@ public class User {
         this.username = username;
     }
 
-    public String getPassword() {
-        return password;
+    public String getPasswordHash() {
+        return passwordHash;
     }
 
-    public void setPassword(String password) {
-        this.password = password;
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     public String getStatus() {
@@ -50,7 +52,11 @@ public class User {
         this.status = status;
     }
 
-    public Object getPasswordHash() {
-        throw new UnsupportedOperationException("Not supported yet."); 
+    public Timestamp getLastSeen() {
+        return lastSeen;
+    }
+
+    public void setLastSeen(Timestamp lastSeen) {
+        this.lastSeen = lastSeen;
     }
 }

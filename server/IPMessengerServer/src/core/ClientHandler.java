@@ -179,6 +179,14 @@ public class ClientHandler implements Runnable {
         sendMessage(response);
     }
 
+    private void handleGetFriends() throws SQLException, IOException {
+        sendFriendList();
+    }
+
+    private void handleGetPendingMsgs() throws SQLException, IOException {
+        sendPendingMessages();
+    }
+
     private void handleGetAllUsers() throws SQLException, IOException {
         // Obtener todos los usuarios menos el actual
         UserManager um = new UserManager(); // mejor crear un UserDAO
@@ -374,13 +382,5 @@ public class ClientHandler implements Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    private void handleGetFriends() {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
-    }
-
-    private void handleGetPendingMsgs() {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 }
