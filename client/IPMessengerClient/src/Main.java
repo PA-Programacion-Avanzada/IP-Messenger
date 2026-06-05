@@ -1,4 +1,4 @@
-package main;
+package com.ipmessenger.client;
 
 // Punto de entrada del cliente
 

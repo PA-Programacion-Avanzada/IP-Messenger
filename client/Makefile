@@ -1,30 +1,38 @@
-# Makefile for IP Messenger Client
-# Compile all Java sources and run Main
+# Makefile para IP Messenger Client
+# Compila todos los ficheros Java y ejecuta Main
 
-# Directories
+# ── Directorios ------------------------------------------------------------
 SRC_DIR := IPMessengerClient/src
 BIN_DIR := out
+LIB_DIR := ../lib
 
-# Find all .java files in SRC_DIR
+# ── Archivos --------------------------------------------------------------
 SRCS := $(shell find $(SRC_DIR) -name "*.java")
 
-# Default target
+# ── JARs ---------------------------------------------------------------
+GSON_JAR := $(LIB_DIR)/gson-2.11.0.jar
+
+CP_JARS := $(GSON_JAR)
+
+# ── Meta‑objetivos --------------------------------------------------------
+.PHONY: all compile run clean
+
 all: compile run
 
-# Compile sources
+# ── Compilación -----------------------------------------------------------
 compile:
-	@echo "Compiling sources..."
+	@echo "Compilando fuentes ..."
 	mkdir -p $(BIN_DIR)
-	javac -d $(BIN_DIR) $(SRCS)
+	@#‑cp  incluye las dependencias
+	javac -cp "$(CP_JARS)" -d $(BIN_DIR) $(SRCS)
 
-# Run the application
+# ── Ejecución ------------------------------------------------------------
 run:
-	@echo "Running application..."
-	java -cp $(BIN_DIR) Main
+	@echo "Ejecución ..."
+	@#‑cp  contiene el binario y los JARs
+	java -cp "$(BIN_DIR):$(CP_JARS)" com.ipmessenger.client.Main
 
-# Clean intermediate files
+# ── Limpieza --------------------------------------------------------------
 clean:
-	@echo "Cleaning..."
+	@echo "Limpieza ..."
 	rm -rf $(BIN_DIR)
-
-.PHONY: all compile run clean
