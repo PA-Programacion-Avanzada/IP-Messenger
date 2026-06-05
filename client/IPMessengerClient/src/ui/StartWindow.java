@@ -3,6 +3,7 @@ package ui;
 
 import javax.swing.*;
 import javax.swing.border.*;
+import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.*;
 
@@ -103,6 +104,8 @@ public class StartWindow extends JFrame {
 
         // Campo Servidor IP
         serverIpField = createTextField("ej. 192.168.1.100");
+        ((AbstractDocument)serverIpField.getDocument()).setDocumentFilter(new IPDocumentFilter());
+        serverIpField.setInputVerifier(new IPInputVerifier());
         dialogPanel.add(createFieldRow("Servidor IP:", serverIpField));
         dialogPanel.add(Box.createRigidArea(new Dimension(0, 15)));
 
@@ -255,5 +258,75 @@ public class StartWindow extends JFrame {
             StartWindow window = new StartWindow();
             window.setVisible(true);
         });
+    }
+
+    //  Personalizado: filtro de caracteres y longitud del campo IP
+    private static class IPDocumentFilter extends DocumentFilter {
+        private static final int MAX_LEN = 15;          // "255.255.255.255"
+
+        @Override
+        public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr)
+                throws BadLocationException {
+            if (string == null) return;
+            StringBuilder sb = new StringBuilder(fb.getDocument().getText(0, fb.getDocument().getLength()));
+            sb.insert(offset, string);
+            if (isAllowed(sb.toString())) {
+                super.insertString(fb, offset, string, attr);
+            }
+        }
+
+        @Override
+        public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs)
+                throws BadLocationException {
+            StringBuilder sb = new StringBuilder(fb.getDocument().getText(0, fb.getDocument().getLength()));
+            sb.replace(offset, offset + length, text);
+            if (isAllowed(sb.toString())) {
+                super.replace(fb, offset, length, text, attrs);
+            }
+        }
+
+        @Override
+        public void remove(FilterBypass fb, int offset, int length) throws BadLocationException {
+            super.remove(fb, offset, length);
+        }
+
+        private boolean isAllowed(String txt) {
+            if (txt.length() > MAX_LEN) return false;
+            // solo dígitos y puntos, y no consecutivos
+            return txt.matches("[0-9.]*") && !txt.contains("..");
+        }
+    }
+
+    /* -------------------------------------------------------------------- */
+    /*  Filtro de verificación de formato (usado también en onConnect)     */
+    /* -------------------------------------------------------------------- */
+    private static class IPInputVerifier extends InputVerifier {
+        @Override
+        public boolean verify(JComponent input) {
+            String txt = ((JTextField) input).getText().trim();
+            if (txt.isEmpty()) return true;          // Si no se escribe nada, se deja a la lógica del servidor
+
+            if (!isValidIPv4(txt)) {
+                showError(input, "IP inválida. Debe ser como 192.168.1.100");
+                return false;
+            }
+            return true;
+        }
+
+        private boolean isValidIPv4(String ip) {
+            String regex = "^([0-9]{1,3}\\.){3}[0-9]{1,3}$";
+            if (!ip.matches(regex)) return false;
+            String[] parts = ip.split("\\.");
+            for (String p : parts) {
+                int v = Integer.parseInt(p);
+                if (v < 0 || v > 255) return false;
+            }
+            return true;
+        }
+
+        private void showError(JComponent input, String msg) {
+            JOptionPane.showMessageDialog(input, msg, "Formato de IP inválido", JOptionPane.ERROR_MESSAGE);
+            input.requestFocusInWindow();
+        }
     }
 }
