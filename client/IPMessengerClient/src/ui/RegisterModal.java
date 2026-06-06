@@ -39,11 +39,17 @@ public class RegisterModal extends JDialog {
 
     public RegisterModal(Frame owner) {
         super(owner, "Registro de Cuenta", true);
+
         initUI();
+
         setMinimumSize(new Dimension(500, 540));
-        setSize(500, 540);
+        setPreferredSize(new Dimension(500, 540));
+        setMaximumSize(new Dimension(500, 540));
+
+        pack();
         setLocationRelativeTo(owner);
         setResizable(false);
+        
         setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
             @Override
@@ -54,24 +60,28 @@ public class RegisterModal extends JDialog {
     }
 
     private void initUI() {
-        // Panel principal con relleno y fondo blanco
+        // Panel principal
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(Color.WHITE);
         mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
 
-        // Cabecera con título y botón cerrar
+        // Dimensiones fijas: 500 × 540
+        Dimension dim = new Dimension(500, 540);
+        mainPanel.setPreferredSize(dim);
+        mainPanel.setMaximumSize(dim);      // impide expandir verticalmente
+
+        // Construir header + form + footer
         mainPanel.add(createHeaderPanel(), BorderLayout.NORTH);
-
-        // Panel central con formulario
-        mainPanel.add(createFormPanel(), BorderLayout.CENTER);
-
-        // Panel inferior con enlace
+        mainPanel.add(createFormPanel(),   BorderLayout.CENTER);
         mainPanel.add(createFooterPanel(), BorderLayout.SOUTH);
 
+        // Añadimos al diálogo
         add(mainPanel);
+
+        // Borde externo (para el recuadro blanco)
         getRootPane().setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
-                BorderFactory.createEmptyBorder(5, 5, 5, 5)
+            BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
+            BorderFactory.createEmptyBorder(5, 5, 5, 5)
         ));
     }
 
@@ -118,14 +128,18 @@ public class RegisterModal extends JDialog {
 
         // Campo Contraseña
         passwordField = new JPasswordField();
-        passwordField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        passwordField.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         passwordField.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
-                BorderFactory.createEmptyBorder(8, 10, 8, 10)
+                BorderFactory.createEmptyBorder(5, 10, 5, 10)
         ));
         passwordField.setEchoChar('•');
+        setPasswordFieldSize(passwordField);
+
         formPanel.add(createFieldRow("Contraseña:", passwordField));
         formPanel.add(Box.createRigidArea(new Dimension(0, 20)));
+
+        formPanel.add(Box.createVerticalGlue());
 
         // Botones
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
@@ -190,13 +204,18 @@ public class RegisterModal extends JDialog {
 
     private JTextField createTextField(String placeholder) {
         JTextField field = new JTextField();
-        field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        field.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
-                BorderFactory.createEmptyBorder(8, 10, 8, 10)
-        ));
+        field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+
+        Border inner = BorderFactory.createLineBorder(new Color(200, 200, 200), 1);
+        Border outer = BorderFactory.createCompoundBorder(
+                inner,
+                BorderFactory.createEmptyBorder(6, 12, 6, 12)
+        );
+
+        field.setBorder(outer);
         field.setText(placeholder);
         field.setForeground(Color.GRAY);
+
         field.addFocusListener(new FocusAdapter() {
             @Override
             public void focusGained(FocusEvent e) {
@@ -213,15 +232,40 @@ public class RegisterModal extends JDialog {
                 }
             }
         });
+
+        // Fijar altura
+        int height = 30;
+        field.setPreferredSize(new Dimension(0, height));
+        field.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
         return field;
+    }
+
+    private void setPasswordFieldSize(JPasswordField pf) {
+        pf.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        int h = 35;
+
+        // Borde interno
+        Border inner = BorderFactory.createLineBorder(new Color(200, 200, 200), 1);
+        pf.setBorder(BorderFactory.createCompoundBorder(
+                inner,
+                BorderFactory.createEmptyBorder(6, 12, 6, 12)
+        ));
+
+        pf.setPreferredSize(new Dimension(0, h));
+        pf.setMaximumSize(new Dimension(Integer.MAX_VALUE, h));
     }
 
     private JPanel createFieldRow(String labelText, JComponent field) {
         JPanel row = new JPanel(new BorderLayout(10, 0));
         row.setBackground(Color.WHITE);
+
         JLabel label = new JLabel(labelText);
         label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         label.setPreferredSize(new Dimension(100, 30));
+
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+        label.setMaximumSize(new Dimension(100, 30));
+
         row.add(label, BorderLayout.WEST);
         row.add(field, BorderLayout.CENTER);
         return row;

@@ -103,7 +103,7 @@ public class RecoverAccountModal extends JDialog {
         JLabel description = new JLabel("<html>Ingresa el servidor, tu usuario y la nueva contraseña.<br>Se actualizará directamente en el servidor.</html>");
         description.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         description.setForeground(new Color(80, 80, 80));
-        description.setAlignmentX(Component.LEFT_ALIGNMENT);
+        description.setAlignmentX(Component.CENTER_ALIGNMENT);
         formPanel.add(description);
         formPanel.add(Box.createRigidArea(new Dimension(0, 20)));
 
