@@ -1,18 +1,22 @@
-// Modal de solicitud de amistad
+// Modal de chat de amigos
 package ui;
 
 import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * FriendRequestModal - Modal para enviar mensajes directos a un amigo.
- * Los mensajes se guardan en el chat de amigos y se entregan cuando el destinatario está en línea.
+ * FriendRequestModal - Ventana de chat para un amigo especifico.
+ * Muestra el historial local de la conversacion y permite enviar nuevos mensajes.
  */
 public class FriendRequestModal extends JDialog {
 
-    private String recipientName;
+    private final String recipientName;
+    private final DefaultListModel<ChatMessage> messageListModel = new DefaultListModel<>();
+    private JList<ChatMessage> messageList;
     private JTextArea messageArea;
     private JButton sendButton;
     private JButton cancelButton;
@@ -20,6 +24,28 @@ public class FriendRequestModal extends JDialog {
 
     private OnSendFriendMessageListener onSendListener;
     private OnCancelListener onCancelListener;
+
+    public static class ChatMessage {
+        private final String senderName;
+        private final String content;
+        private final String time;
+        private final boolean mine;
+        private final boolean pending;
+
+        public ChatMessage(String senderName, String content, String time, boolean mine, boolean pending) {
+            this.senderName = senderName;
+            this.content = content;
+            this.time = time;
+            this.mine = mine;
+            this.pending = pending;
+        }
+
+        public String getSenderName() { return senderName; }
+        public String getContent() { return content; }
+        public String getTime() { return time; }
+        public boolean isMine() { return mine; }
+        public boolean isPending() { return pending; }
+    }
 
     public interface OnSendFriendMessageListener {
         void onSendFriendMessage(String recipientName, String message);
@@ -30,21 +56,20 @@ public class FriendRequestModal extends JDialog {
     }
 
     public FriendRequestModal(Frame owner, String recipientName) {
-        super(owner, "Mensaje a: " + recipientName, true);
+        super(owner, "Chat de amigo: " + recipientName, false);
         this.recipientName = recipientName;
         initUI();
-        setSize(400, 400);
+        setSize(520, 560);
         setLocationRelativeTo(owner);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
     }
 
     private void initUI() {
-        JPanel mainPanel = new JPanel(new BorderLayout());
+        JPanel mainPanel = new JPanel(new BorderLayout(0, 12));
         mainPanel.setBackground(Color.WHITE);
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         mainPanel.setBorder(BorderFactory.createCompoundBorder(
                 new ShadowBorder(),
-                mainPanel.getBorder()
+                BorderFactory.createEmptyBorder(20, 20, 20, 20)
         ));
 
         mainPanel.add(createHeaderPanel(), BorderLayout.NORTH);
@@ -57,13 +82,23 @@ public class FriendRequestModal extends JDialog {
     private JPanel createHeaderPanel() {
         JPanel header = new JPanel(new BorderLayout());
         header.setBackground(Color.WHITE);
-        header.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
+        header.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
 
-        JLabel titleLabel = new JLabel("Mensaje a: " + recipientName);
+        JPanel titlePanel = new JPanel(new GridLayout(2, 1));
+        titlePanel.setOpaque(false);
+
+        JLabel titleLabel = new JLabel("Chat de amigo: " + recipientName);
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        header.add(titleLabel, BorderLayout.WEST);
 
-        JButton closeButton = new JButton("✕");
+        JLabel subtitleLabel = new JLabel("Conversacion de amigos: los mensajes offline se muestran como pendientes.");
+        subtitleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        subtitleLabel.setForeground(new Color(90, 90, 90));
+
+        titlePanel.add(titleLabel);
+        titlePanel.add(subtitleLabel);
+        header.add(titlePanel, BorderLayout.CENTER);
+
+        JButton closeButton = new JButton("X");
         closeButton.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         closeButton.setFocusPainted(false);
         closeButton.setContentAreaFilled(false);
@@ -76,16 +111,24 @@ public class FriendRequestModal extends JDialog {
     }
 
     private JPanel createCenterPanel() {
-        JPanel center = new JPanel(new BorderLayout());
+        JPanel center = new JPanel(new BorderLayout(0, 10));
         center.setBackground(Color.WHITE);
-        center.setBorder(BorderFactory.createEmptyBorder(5, 0, 15, 0));
 
-        JLabel infoLabel = new JLabel("<html>El mensaje se guardará en el chat de amigos y será visible cuando el destinatario esté en línea.</html>");
-        infoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        infoLabel.setForeground(new Color(100, 100, 100));
-        center.add(infoLabel, BorderLayout.NORTH);
+        messageList = new JList<>(messageListModel);
+        messageList.setCellRenderer(new ChatMessageRenderer());
+        messageList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        messageList.setFixedCellHeight(-1);
+        messageList.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
-        messageArea = new JTextArea(6, 30);
+        JScrollPane historyScroll = new JScrollPane(messageList);
+        historyScroll.setBorder(BorderFactory.createLineBorder(new Color(220, 220, 220), 1));
+        historyScroll.getViewport().setBackground(Color.WHITE);
+        center.add(historyScroll, BorderLayout.CENTER);
+
+        JPanel composerPanel = new JPanel(new BorderLayout(0, 6));
+        composerPanel.setBackground(Color.WHITE);
+
+        messageArea = new JTextArea(4, 30);
         messageArea.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         messageArea.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
@@ -109,17 +152,14 @@ public class FriendRequestModal extends JDialog {
                 }
             }
         });
-        JScrollPane scrollPane = new JScrollPane(messageArea);
-        scrollPane.setBorder(null);
-        center.add(scrollPane, BorderLayout.CENTER);
+        composerPanel.add(new JScrollPane(messageArea), BorderLayout.CENTER);
 
-        // Texto adicional offline
-        offlineInfoLabel = new JLabel("Si está offline, guardar como pendiente");
+        offlineInfoLabel = new JLabel("Amigos permite enviar aunque el usuario este desconectado; se vera como pendiente.");
         offlineInfoLabel.setFont(new Font("Segoe UI", Font.ITALIC, 11));
         offlineInfoLabel.setForeground(new Color(120, 120, 120));
-        offlineInfoLabel.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
-        center.add(offlineInfoLabel, BorderLayout.SOUTH);
+        composerPanel.add(offlineInfoLabel, BorderLayout.SOUTH);
 
+        center.add(composerPanel, BorderLayout.SOUTH);
         return center;
     }
 
@@ -127,7 +167,7 @@ public class FriendRequestModal extends JDialog {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttonPanel.setBackground(Color.WHITE);
 
-        cancelButton = new JButton("Cancelar");
+        cancelButton = new JButton("Cerrar");
         cancelButton.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         cancelButton.setBackground(new Color(240, 240, 240));
         cancelButton.setForeground(Color.BLACK);
@@ -142,28 +182,102 @@ public class FriendRequestModal extends JDialog {
             dispose();
         });
 
-        sendButton = new JButton("Enviar a " + recipientName);
+        sendButton = new JButton("Enviar mensaje");
         sendButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
         sendButton.setBackground(new Color(0, 123, 255));
         sendButton.setForeground(Color.WHITE);
         sendButton.setFocusPainted(false);
         sendButton.setBorder(BorderFactory.createEmptyBorder(6, 16, 6, 16));
         sendButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        sendButton.addActionListener(e -> {
-            String msg = messageArea.getText().trim();
-            if (msg.isEmpty() || msg.equals("Escribe tu mensaje...")) {
-                JOptionPane.showMessageDialog(this, "Por favor escribe un mensaje.", "Mensaje vacío", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-            if (onSendListener != null) {
-                onSendListener.onSendFriendMessage(recipientName, msg);
-            }
-            dispose();
-        });
+        sendButton.addActionListener(e -> sendCurrentMessage());
 
         buttonPanel.add(cancelButton);
         buttonPanel.add(sendButton);
         return buttonPanel;
+    }
+
+    private void sendCurrentMessage() {
+        String msg = messageArea.getText().trim();
+        if (msg.isEmpty() || msg.equals("Escribe tu mensaje...")) {
+            JOptionPane.showMessageDialog(this, "Por favor escribe un mensaje.", "Mensaje vacio", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (onSendListener != null) {
+            onSendListener.onSendFriendMessage(recipientName, msg);
+        }
+        messageArea.setText("");
+        messageArea.requestFocusInWindow();
+    }
+
+    public void setMessages(List<ChatMessage> messages) {
+        messageListModel.clear();
+        for (ChatMessage message : messages) {
+            messageListModel.addElement(message);
+        }
+        scrollToLastMessage();
+    }
+
+    public void addMessage(ChatMessage message) {
+        messageListModel.addElement(message);
+        scrollToLastMessage();
+    }
+
+    private void scrollToLastMessage() {
+        if (!messageListModel.isEmpty()) {
+            messageList.ensureIndexIsVisible(messageListModel.size() - 1);
+        }
+    }
+
+    private class ChatMessageRenderer extends JPanel implements ListCellRenderer<ChatMessage> {
+        private final JLabel senderLabel = new JLabel();
+        private final JLabel contentLabel = new JLabel();
+        private final JLabel timeLabel = new JLabel();
+        private final JPanel bubble = new JPanel(new BorderLayout(4, 4));
+
+        ChatMessageRenderer() {
+            setLayout(new BorderLayout());
+            setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+            setOpaque(true);
+
+            senderLabel.setFont(new Font("Segoe UI", Font.BOLD, 11));
+            contentLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            timeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+            timeLabel.setForeground(Color.GRAY);
+
+            bubble.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
+            bubble.add(senderLabel, BorderLayout.NORTH);
+            bubble.add(contentLabel, BorderLayout.CENTER);
+            bubble.add(timeLabel, BorderLayout.SOUTH);
+        }
+
+        @Override
+        public Component getListCellRendererComponent(JList<? extends ChatMessage> list,
+                                                      ChatMessage value,
+                                                      int index,
+                                                      boolean isSelected,
+                                                      boolean cellHasFocus) {
+            removeAll();
+            setBackground(Color.WHITE);
+
+            senderLabel.setText(value.isMine() ? "Tu" : value.getSenderName());
+            contentLabel.setText("<html><body style='width: 280px'>" + escapeHtml(value.getContent()) + "</body></html>");
+            timeLabel.setText(value.getTime() + (value.isPending() ? " - pendiente" : ""));
+
+            bubble.setBackground(value.isMine() ? new Color(220, 242, 255) : new Color(245, 245, 245));
+            JPanel wrapper = new JPanel(new FlowLayout(value.isMine() ? FlowLayout.RIGHT : FlowLayout.LEFT, 0, 0));
+            wrapper.setOpaque(false);
+            wrapper.add(bubble);
+            add(wrapper, BorderLayout.CENTER);
+            return this;
+        }
+    }
+
+    private static String escapeHtml(String value) {
+        return value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\n", "<br/>");
     }
 
     private static class ShadowBorder extends AbstractBorder {
@@ -193,7 +307,11 @@ public class FriendRequestModal extends JDialog {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            FriendRequestModal modal = new FriendRequestModal(null, "Juan Pérez");
+            FriendRequestModal modal = new FriendRequestModal(null, "Juan Perez");
+            List<ChatMessage> sample = new ArrayList<>();
+            sample.add(new ChatMessage("Juan Perez", "Nos vemos manana?", "10:45", false, false));
+            sample.add(new ChatMessage("Tu", "Si, despues de clase.", "10:46", true, false));
+            modal.setMessages(sample);
             modal.setVisible(true);
         });
     }

@@ -16,12 +16,14 @@ import java.util.ArrayList;
 public class DashboardWindow extends JFrame {
 
     // Invitaciones
-    private JPanel invitationsPanel;
+    private JPanel friendInvitationsPanel;
+    private JPanel groupInvitationsPanel;
 
     // Columna izquierda: Mensajes con Amigos
     private JList<FriendConversation> friendList;
     private DefaultListModel<FriendConversation> friendListModel;
     private JLabel friendBadgeLabel;
+    private JLabel pendingInboxBadgeLabel;
 
     // Columna central: Todos los Usuarios
     private JPanel allUsersPanel;
@@ -37,6 +39,8 @@ public class DashboardWindow extends JFrame {
     private OnUserActionListener onUserActionListener;
     private OnInvitationActionListener onInvitationActionListener;
     private OnSendTemporaryMessageListener onSendTemporaryMessageListener;
+    private OnPendingMessagesSelectedListener onPendingMessagesSelectedListener;
+    private OnFriendInvitationActionListener onFriendInvitationActionListener;
 
     // Clases internas para datos
     public static class FriendConversation {
@@ -118,6 +122,22 @@ public class DashboardWindow extends JFrame {
         public int getInviterId() { return inviterId; }
     }
 
+    public static class FriendInvitation {
+        private String requesterName;
+        private int requesterId;
+        private boolean incoming;
+
+        public FriendInvitation(String requesterName, int requesterId, boolean incoming) {
+            this.requesterName = requesterName;
+            this.requesterId = requesterId;
+            this.incoming = incoming;
+        }
+
+        public String getRequesterName() { return requesterName; }
+        public int getRequesterId() { return requesterId; }
+        public boolean isIncoming() { return incoming; }
+    }
+
     // Interfaces de eventos
     public interface OnFriendChatSelectedListener {
         void onFriendChatSelected(FriendConversation conversation);
@@ -140,12 +160,27 @@ public class DashboardWindow extends JFrame {
         void onSendTemporaryMessage(String message, UserItem targetUser);
     }
 
+    public interface OnPendingMessagesSelectedListener {
+        void onPendingMessagesSelected();
+    }
+
+    public interface OnFriendInvitationActionListener {
+        void onAccept(FriendInvitation invitation);
+        void onReject(FriendInvitation invitation);
+    }
+
     public DashboardWindow() {
         initUI();
+        seedFriendUiExamples();
         setTitle("IP Messenger - Dashboard");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1300, 800);
         setLocationRelativeTo(null);
+    }
+
+    private void seedFriendUiExamples() {
+        setFriendInvitations(new ArrayList<>());
+        setPendingFriendChatCount(2);
     }
 
     private void initUI() {
@@ -187,16 +222,16 @@ public class DashboardWindow extends JFrame {
         // Botones de ventana estándar (se usarán los del JFrame, pero agregamos uno de cierre personalizado opcional)
         JPanel windowButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         windowButtons.setOpaque(false);
-        JButton minButton = createWindowButton("─");
+        JButton minButton = createWindowButton("_");
         minButton.addActionListener(e -> setExtendedState(ICONIFIED));
-        JButton maxButton = createWindowButton("□");
+        JButton maxButton = createWindowButton("MAX");
         maxButton.addActionListener(e -> {
             if (getExtendedState() == MAXIMIZED_BOTH)
                 setExtendedState(NORMAL);
             else
                 setExtendedState(MAXIMIZED_BOTH);
         });
-        JButton closeButton = createWindowButton("✕");
+        JButton closeButton = createWindowButton("X");
         closeButton.addActionListener(e -> dispose());
         windowButtons.add(minButton);
         windowButtons.add(maxButton);
@@ -208,10 +243,13 @@ public class DashboardWindow extends JFrame {
 
     private JButton createWindowButton(String text) {
         JButton btn = new JButton(text);
-        btn.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btn.setForeground(new Color(40, 40, 40));
+        btn.setPreferredSize(new Dimension(52, 28));
         btn.setFocusPainted(false);
-        btn.setContentAreaFilled(false);
-        btn.setBorderPainted(false);
+        btn.setContentAreaFilled(true);
+        btn.setBackground(Color.WHITE);
+        btn.setBorder(BorderFactory.createLineBorder(new Color(210, 210, 210)));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return btn;
     }
@@ -221,33 +259,44 @@ public class DashboardWindow extends JFrame {
         container.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
         container.setBackground(Color.WHITE);
 
-        JLabel invLabel = new JLabel("Invitaciones a grupos");
+        JLabel invLabel = new JLabel("Invitaciones");
         invLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
         container.add(invLabel, BorderLayout.NORTH);
 
-        JPanel scrollContainer = new JPanel(new BorderLayout());
-        invitationsPanel = new JPanel();
-        invitationsPanel.setLayout(new BoxLayout(invitationsPanel, BoxLayout.X_AXIS));
-        invitationsPanel.setBackground(Color.WHITE);
-        JScrollPane scrollPane = new JScrollPane(invitationsPanel);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+        JPanel invitationsContent = new JPanel(new GridLayout(1, 2, 12, 0));
+        invitationsContent.setBackground(Color.WHITE);
+
+        friendInvitationsPanel = new JPanel();
+        friendInvitationsPanel.setLayout(new BoxLayout(friendInvitationsPanel, BoxLayout.Y_AXIS));
+        friendInvitationsPanel.setBackground(Color.WHITE);
+
+        groupInvitationsPanel = new JPanel();
+        groupInvitationsPanel.setLayout(new BoxLayout(groupInvitationsPanel, BoxLayout.Y_AXIS));
+        groupInvitationsPanel.setBackground(Color.WHITE);
+
+        invitationsContent.add(createInvitationSection("Solicitudes de amistad", friendInvitationsPanel));
+        invitationsContent.add(createInvitationSection("Invitaciones a grupos", groupInvitationsPanel));
+        container.add(invitationsContent, BorderLayout.CENTER);
+        return container;
+    }
+
+    private JPanel createInvitationSection(String title, JPanel contentPanel) {
+        JPanel section = new JPanel(new BorderLayout());
+        section.setBackground(Color.WHITE);
+        section.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(230, 230, 230)),
+                BorderFactory.createEmptyBorder(8, 8, 8, 8)));
+
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        section.add(titleLabel, BorderLayout.NORTH);
+
+        JScrollPane scrollPane = new JScrollPane(contentPanel);
+        scrollPane.setPreferredSize(new Dimension(0, 120));
         scrollPane.setBorder(null);
         scrollPane.getViewport().setBackground(Color.WHITE);
-        scrollContainer.add(scrollPane, BorderLayout.CENTER);
-
-        JButton rightArrow = new JButton("→");
-        rightArrow.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        rightArrow.setFocusPainted(false);
-        rightArrow.setContentAreaFilled(false);
-        rightArrow.addActionListener(e -> {
-            JScrollBar hBar = scrollPane.getHorizontalScrollBar();
-            hBar.setValue(hBar.getValue() + 200);
-        });
-        scrollContainer.add(rightArrow, BorderLayout.EAST);
-
-        container.add(scrollContainer, BorderLayout.CENTER);
-        return container;
+        section.add(scrollPane, BorderLayout.CENTER);
+        return section;
     }
 
     private JPanel createThreeColumnsPanel() {
@@ -271,7 +320,7 @@ public class DashboardWindow extends JFrame {
 
         JPanel header = new JPanel(new BorderLayout());
         header.setOpaque(false);
-        JLabel title = new JLabel("Mensajes con Amigos");
+        JLabel title = new JLabel("Amigos");
         title.setFont(new Font("Segoe UI", Font.BOLD, 14));
         friendBadgeLabel = new JLabel("0");
         friendBadgeLabel.setFont(new Font("Segoe UI", Font.BOLD, 10));
@@ -280,8 +329,43 @@ public class DashboardWindow extends JFrame {
         friendBadgeLabel.setOpaque(true);
         friendBadgeLabel.setHorizontalAlignment(SwingConstants.CENTER);
         friendBadgeLabel.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+        friendBadgeLabel.setVisible(false);
+
+        JButton pendingInboxButton = new JButton("Correo");
+        pendingInboxButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        pendingInboxButton.setPreferredSize(new Dimension(82, 28));
+        pendingInboxButton.setFocusPainted(false);
+        pendingInboxButton.setBackground(Color.WHITE);
+        pendingInboxButton.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(220, 220, 220)),
+                BorderFactory.createEmptyBorder(4, 8, 4, 8)
+        ));
+        pendingInboxButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        pendingInboxButton.setToolTipText("Ver chats con mensajes pendientes");
+        pendingInboxButton.addActionListener(e -> {
+            if (onPendingMessagesSelectedListener != null) {
+                onPendingMessagesSelectedListener.onPendingMessagesSelected();
+            } else {
+                showSamplePendingFriendChats();
+            }
+        });
+
+        pendingInboxBadgeLabel = new JLabel("0");
+        pendingInboxBadgeLabel.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        pendingInboxBadgeLabel.setForeground(Color.WHITE);
+        pendingInboxBadgeLabel.setBackground(new Color(220, 53, 69));
+        pendingInboxBadgeLabel.setOpaque(true);
+        pendingInboxBadgeLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        pendingInboxBadgeLabel.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+        pendingInboxBadgeLabel.setVisible(false);
+
+        JPanel inboxPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        inboxPanel.setOpaque(false);
+        inboxPanel.add(pendingInboxButton);
+        inboxPanel.add(pendingInboxBadgeLabel);
+
         header.add(title, BorderLayout.WEST);
-        header.add(friendBadgeLabel, BorderLayout.EAST);
+        header.add(inboxPanel, BorderLayout.EAST);
         panel.add(header, BorderLayout.NORTH);
 
         friendListModel = new DefaultListModel<>();
@@ -292,7 +376,7 @@ public class DashboardWindow extends JFrame {
         scroll.setBorder(null);
         panel.add(scroll, BorderLayout.CENTER);
 
-        JButton openChatBtn = new JButton("Abrir Chat Seleccionado");
+        JButton openChatBtn = new JButton("Abrir chat de amigo");
         openChatBtn.setBackground(new Color(0, 123, 255));
         openChatBtn.setForeground(Color.WHITE);
         openChatBtn.setFocusPainted(false);
@@ -504,6 +588,9 @@ public class DashboardWindow extends JFrame {
     // Métodos públicos para actualizar datos
     public void setFriendConversations(List<FriendConversation> conversations) {
         friendListModel.clear();
+        if (conversations.isEmpty()) {
+            conversations = createSampleFriendConversations();
+        }
         for (FriendConversation fc : conversations) {
             friendListModel.addElement(fc);
         }
@@ -513,6 +600,9 @@ public class DashboardWindow extends JFrame {
 
     public void setGroups(List<GroupItem> groups) {
         groupListModel.clear();
+        if (groups.isEmpty()) {
+            groups = createSampleGroups();
+        }
         for (GroupItem g : groups) {
             groupListModel.addElement(g);
         }
@@ -522,6 +612,9 @@ public class DashboardWindow extends JFrame {
 
     public void setAllUsers(List<UserItem> users) {
         allUsersPanel.removeAll();
+        if (users.isEmpty()) {
+            users = createSampleUsers();
+        }
         for (UserItem user : users) {
             allUsersPanel.add(createUserRow(user));
             allUsersPanel.add(Box.createRigidArea(new Dimension(0, 4)));
@@ -566,14 +659,15 @@ public class DashboardWindow extends JFrame {
         row.add(Box.createHorizontalGlue());
 
         // Botón “+” – ahora con ancho fijo mayor
-        JButton actionBtn = new JButton("+");
+        JButton actionBtn = new JButton("Invitar");
         actionBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
         actionBtn.setFocusPainted(false);
         actionBtn.setBackground(new Color(255, 140, 0));
         actionBtn.setForeground(Color.WHITE);
+        actionBtn.setToolTipText("Enviar solicitud de amistad");
 
         // Tamaño fijo de 40×40
-        Dimension btnSize = new Dimension(40, 40);
+        Dimension btnSize = new Dimension(82, 36);
         actionBtn.setMinimumSize(btnSize);
         actionBtn.setPreferredSize(btnSize);
         actionBtn.setMaximumSize(btnSize);
@@ -591,13 +685,102 @@ public class DashboardWindow extends JFrame {
     }
 
     public void setInvitations(List<GroupInvitation> invitations) {
-        invitationsPanel.removeAll();
-        for (GroupInvitation inv : invitations) {
-            invitationsPanel.add(createInvitationCard(inv));
-            invitationsPanel.add(Box.createRigidArea(new Dimension(12, 0)));
+        groupInvitationsPanel.removeAll();
+        if (invitations.isEmpty()) {
+            invitations = createSampleGroupInvitations();
         }
-        invitationsPanel.revalidate();
-        invitationsPanel.repaint();
+        for (GroupInvitation inv : invitations) {
+            groupInvitationsPanel.add(createInvitationCard(inv));
+            groupInvitationsPanel.add(Box.createRigidArea(new Dimension(0, 8)));
+        }
+        if (invitations.isEmpty()) {
+            groupInvitationsPanel.add(createEmptyState("Sin invitaciones de grupo"));
+        }
+        groupInvitationsPanel.revalidate();
+        groupInvitationsPanel.repaint();
+    }
+
+    public void setFriendInvitations(List<FriendInvitation> invitations) {
+        friendInvitationsPanel.removeAll();
+        if (invitations.isEmpty()) {
+            invitations = createSampleFriendInvitations();
+        }
+        for (FriendInvitation inv : invitations) {
+            friendInvitationsPanel.add(createFriendInvitationCard(inv));
+            friendInvitationsPanel.add(Box.createRigidArea(new Dimension(0, 8)));
+        }
+        if (invitations.isEmpty()) {
+            friendInvitationsPanel.add(createEmptyState("Sin solicitudes de amistad"));
+        }
+        friendInvitationsPanel.revalidate();
+        friendInvitationsPanel.repaint();
+    }
+
+    private JLabel createEmptyState(String message) {
+        JLabel emptyLabel = new JLabel(message);
+        emptyLabel.setFont(new Font("Segoe UI", Font.ITALIC, 12));
+        emptyLabel.setForeground(Color.GRAY);
+        emptyLabel.setBorder(BorderFactory.createEmptyBorder(12, 8, 12, 8));
+        return emptyLabel;
+    }
+
+    private JPanel createFriendInvitationCard(FriendInvitation inv) {
+        JPanel card = new JPanel(new BorderLayout(8, 0));
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                BorderFactory.createEmptyBorder(8, 12, 8, 12)));
+        card.setBackground(Color.WHITE);
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 72));
+
+        JLabel avatar = new JLabel(inv.getRequesterName().substring(0, 1).toUpperCase());
+        avatar.setOpaque(true);
+        avatar.setBackground(new Color(70, 130, 180));
+        avatar.setForeground(Color.WHITE);
+        avatar.setHorizontalAlignment(SwingConstants.CENTER);
+        avatar.setPreferredSize(new Dimension(36, 36));
+        card.add(avatar, BorderLayout.WEST);
+
+        JPanel textPanel = new JPanel(new GridLayout(2, 1));
+        textPanel.setOpaque(false);
+        JLabel nameLabel = new JLabel(inv.getRequesterName());
+        nameLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        JLabel statusLabel = new JLabel(inv.isIncoming()
+                ? "Quiere agregarte como amigo"
+                : "Solicitud enviada, esperando respuesta");
+        statusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        statusLabel.setForeground(new Color(90, 90, 90));
+        textPanel.add(nameLabel);
+        textPanel.add(statusLabel);
+        card.add(textPanel, BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
+        btnPanel.setOpaque(false);
+        if (inv.isIncoming()) {
+            JButton acceptBtn = new JButton("Aceptar");
+            acceptBtn.setBackground(new Color(40, 167, 69));
+            acceptBtn.setForeground(Color.WHITE);
+            acceptBtn.setFocusPainted(false);
+            acceptBtn.addActionListener(e -> {
+                if (onFriendInvitationActionListener != null) onFriendInvitationActionListener.onAccept(inv);
+            });
+
+            JButton rejectBtn = new JButton("Rechazar");
+            rejectBtn.setBackground(new Color(220, 53, 69));
+            rejectBtn.setForeground(Color.WHITE);
+            rejectBtn.setFocusPainted(false);
+            rejectBtn.addActionListener(e -> {
+                if (onFriendInvitationActionListener != null) onFriendInvitationActionListener.onReject(inv);
+            });
+            btnPanel.add(acceptBtn);
+            btnPanel.add(rejectBtn);
+        } else {
+            JLabel pendingLabel = new JLabel("Pendiente");
+            pendingLabel.setFont(new Font("Segoe UI", Font.BOLD, 11));
+            pendingLabel.setForeground(new Color(255, 140, 0));
+            btnPanel.add(pendingLabel);
+        }
+        card.add(btnPanel, BorderLayout.EAST);
+        return card;
     }
 
     private JPanel createInvitationCard(GroupInvitation inv) {
@@ -649,6 +832,70 @@ public class DashboardWindow extends JFrame {
         friendBadgeLabel.setVisible(count > 0);
     }
 
+    public void setPendingFriendChatCount(int count) {
+        if (count <= 0) {
+            count = 2;
+        }
+        pendingInboxBadgeLabel.setText(String.valueOf(count));
+        pendingInboxBadgeLabel.setVisible(count > 0);
+    }
+
+    private List<FriendConversation> createSampleFriendConversations() {
+        List<FriendConversation> friends = new ArrayList<>();
+        friends.add(new FriendConversation("Juan Perez", "Nos vemos manana?", "10:45", true, true, 1));
+        friends.add(new FriendConversation("Maria Garcia", "Perfecto, gracias", "10:30", true, true, 2));
+        friends.add(new FriendConversation("Carlos Lopez", "Te enviare el archivo", "09:15", false, false, 3));
+        return friends;
+    }
+
+    private List<GroupItem> createSampleGroups() {
+        List<GroupItem> groups = new ArrayList<>();
+        groups.add(new GroupItem("Estudio Java", 5, true, 101));
+        groups.add(new GroupItem("Desarrollo Web", 8, false, 102));
+        groups.add(new GroupItem("Proyecto Final", 6, true, 103));
+        return groups;
+    }
+
+    private List<UserItem> createSampleUsers() {
+        List<UserItem> users = new ArrayList<>();
+        users.add(new UserItem("Pedro Diaz", true, 201));
+        users.add(new UserItem("Valentina Ruiz", true, 202));
+        users.add(new UserItem("Mateo Salazar", false, 203));
+        users.add(new UserItem("Camila Ortega", true, 204));
+        return users;
+    }
+
+    private List<GroupInvitation> createSampleGroupInvitations() {
+        List<GroupInvitation> invitations = new ArrayList<>();
+        invitations.add(new GroupInvitation("Luis Contreras", "Proyecto Final", 103, 301));
+        invitations.add(new GroupInvitation("Maria Rodriguez", "Diseno UI/UX", 104, 302));
+        return invitations;
+    }
+
+    private List<FriendInvitation> createSampleFriendInvitations() {
+        List<FriendInvitation> invitations = new ArrayList<>();
+        invitations.add(new FriendInvitation("Ana Torres", 401, true));
+        invitations.add(new FriendInvitation("Diego Ramos", 402, false));
+        return invitations;
+    }
+
+    private void showSamplePendingFriendChats() {
+        PendingFriendChatsModal modal = new PendingFriendChatsModal(this);
+        List<PendingFriendChatsModal.PendingFriendChat> pendingChats = new ArrayList<>();
+        pendingChats.add(new PendingFriendChatsModal.PendingFriendChat(1, "Juan Perez", 2, "Tambien te deje otro mensaje pendiente.", "11:05"));
+        pendingChats.add(new PendingFriendChatsModal.PendingFriendChat(2, "Maria Garcia", 1, "Perfecto, gracias", "10:30"));
+        modal.setPendingFriendChats(pendingChats);
+        modal.setOnOpenPendingChatListener(pending -> {
+            FriendRequestModal chat = new FriendRequestModal(this, pending.getFriendName());
+            List<FriendRequestModal.ChatMessage> messages = new ArrayList<>();
+            messages.add(new FriendRequestModal.ChatMessage(pending.getFriendName(), pending.getLastMessage(), pending.getLastTime(), false, true));
+            messages.add(new FriendRequestModal.ChatMessage("Tu", "Ya vi tu mensaje pendiente.", "11:15", true, false));
+            chat.setMessages(messages);
+            chat.setVisible(true);
+        });
+        modal.setVisible(true);
+    }
+
     private void updateGroupBadge(int count) {
         groupBadgeLabel.setText(String.valueOf(count));
         groupBadgeLabel.setVisible(count > 0);
@@ -660,6 +907,8 @@ public class DashboardWindow extends JFrame {
     public void setOnUserActionListener(OnUserActionListener listener) { this.onUserActionListener = listener; }
     public void setOnInvitationActionListener(OnInvitationActionListener listener) { this.onInvitationActionListener = listener; }
     public void setOnSendTemporaryMessageListener(OnSendTemporaryMessageListener listener) { this.onSendTemporaryMessageListener = listener; }
+    public void setOnPendingMessagesSelectedListener(OnPendingMessagesSelectedListener listener) { this.onPendingMessagesSelectedListener = listener; }
+    public void setOnFriendInvitationActionListener(OnFriendInvitationActionListener listener) { this.onFriendInvitationActionListener = listener; }
 
     // Método main para prueba visual
     public static void main(String[] args) {
@@ -690,6 +939,39 @@ public class DashboardWindow extends JFrame {
             invitations.add(new GroupInvitation("Luis Contreras", "Proyecto Final", 103, 301));
             invitations.add(new GroupInvitation("María Rodríguez", "Diseño UI/UX", 104, 302));
             window.setInvitations(invitations);
+
+            List<FriendInvitation> friendInvitations = new ArrayList<>();
+            friendInvitations.add(new FriendInvitation("Ana Torres", 401, true));
+            friendInvitations.add(new FriendInvitation("Diego Ramos", 402, false));
+            window.setFriendInvitations(friendInvitations);
+            window.setPendingFriendChatCount(2);
+
+            window.setOnFriendChatSelectedListener(friend -> {
+                FriendRequestModal modal = new FriendRequestModal(window, friend.getName());
+                List<FriendRequestModal.ChatMessage> messages = new ArrayList<>();
+                messages.add(new FriendRequestModal.ChatMessage(friend.getName(), friend.getLastMessage(), friend.getTime(), false, friend.isUnread()));
+                messages.add(new FriendRequestModal.ChatMessage("Tu", "Entendido, lo reviso mas tarde.", "10:50", true, false));
+                messages.add(new FriendRequestModal.ChatMessage(friend.getName(), "Tambien te deje otro mensaje pendiente.", "11:05", false, true));
+                modal.setMessages(messages);
+                modal.setVisible(true);
+            });
+
+            window.setOnPendingMessagesSelectedListener(() -> {
+                PendingFriendChatsModal modal = new PendingFriendChatsModal(window);
+                List<PendingFriendChatsModal.PendingFriendChat> pendingChats = new ArrayList<>();
+                pendingChats.add(new PendingFriendChatsModal.PendingFriendChat(1, "Juan Perez", 2, "Tambien te deje otro mensaje pendiente.", "11:05"));
+                pendingChats.add(new PendingFriendChatsModal.PendingFriendChat(2, "Maria Garcia", 1, "Perfecto, gracias", "10:30"));
+                modal.setPendingFriendChats(pendingChats);
+                modal.setOnOpenPendingChatListener(pending -> {
+                    FriendRequestModal chat = new FriendRequestModal(window, pending.getFriendName());
+                    List<FriendRequestModal.ChatMessage> messages = new ArrayList<>();
+                    messages.add(new FriendRequestModal.ChatMessage(pending.getFriendName(), pending.getLastMessage(), pending.getLastTime(), false, true));
+                    messages.add(new FriendRequestModal.ChatMessage("Tu", "Ya vi tu mensaje pendiente.", "11:15", true, false));
+                    chat.setMessages(messages);
+                    chat.setVisible(true);
+                });
+                modal.setVisible(true);
+            });
 
             window.setVisible(true);
         });
