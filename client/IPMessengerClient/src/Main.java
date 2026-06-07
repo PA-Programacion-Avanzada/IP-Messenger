@@ -24,6 +24,7 @@ public class Main {
     private SessionData session;
     private final Map<Integer, String> userNamesById = new HashMap<>();
     private final Map<Integer, DashboardWindow.FriendConversation> conversationsByUserId = new HashMap<>();
+    private final Map<Integer, ui.PanelGrupos> openGroupPanels = new HashMap<>();
 
 
     public static void main(String[] args) {
@@ -229,7 +230,40 @@ public class Main {
         refreshDashboardData(session);
 
         dashboardWindow.setOnFriendChatSelectedListener(conversation -> openChatWithUser(conversation.getFriendId(), conversation.getName()));
-        dashboardWindow.setOnUserActionListener(user -> openChatWithUser(user.getUserId(), user.getName()));
+        dashboardWindow.setOnUserActionListener(user -> sendFriendRequestToUser(user));
+        dashboardWindow.setOnFriendInvitationActionListener(new DashboardWindow.OnFriendInvitationActionListener() {
+            @Override
+            public void onAccept(DashboardWindow.FriendInvitation invitation) {
+                try {
+                    Map<String, Object> response = client.acceptFriendRequest(invitation.getRequesterId());
+                    if (Protocol.RES_OK.equals(String.valueOf(response.get("status")))) {
+                        JOptionPane.showMessageDialog(dashboardWindow,
+                                "Solicitud de amistad aceptada.", "Amigos", JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        JOptionPane.showMessageDialog(dashboardWindow,
+                                String.valueOf(response.getOrDefault("message", "No se pudo aceptar la solicitud")));
+                    }
+                } catch (IOException ex) {
+                    JOptionPane.showMessageDialog(dashboardWindow, "Error de conexión: " + ex.getMessage());
+                }
+            }
+
+            @Override
+            public void onReject(DashboardWindow.FriendInvitation invitation) {
+                try {
+                    Map<String, Object> response = client.rejectFriendRequest(invitation.getRequesterId());
+                    if (Protocol.RES_OK.equals(String.valueOf(response.get("status")))) {
+                        JOptionPane.showMessageDialog(dashboardWindow,
+                                "Solicitud de amistad rechazada.", "Amigos", JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        JOptionPane.showMessageDialog(dashboardWindow,
+                                String.valueOf(response.getOrDefault("message", "No se pudo rechazar la solicitud")));
+                    }
+                } catch (IOException ex) {
+                    JOptionPane.showMessageDialog(dashboardWindow, "Error de conexión: " + ex.getMessage());
+                }
+            }
+        });
         dashboardWindow.setOnSendTemporaryMessageListener((message, targetUser) -> {
             try {
                 Map<String, Object> response = client.sendGeneralMessage(message);
@@ -243,12 +277,29 @@ public class Main {
         });
 
         dashboardWindow.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        // Registrar listener global para mensajes entrantes (actualiza UI y entrega a paneles abiertos)
+        client.setMessageListener(message -> handleServerMessage(client, message));
         dashboardWindow.setOnGroupSelectedListener(group -> {
             // Abrir PanelGrupos en un diálogo flotante
             try {
                 PanelGrupos miPanelDeGrupos = new PanelGrupos();
                 miPanelDeGrupos.setGroupInfo(group.getName(), group.getMemberCount());
+                if (group.getMemberNames() != null && !group.getMemberNames().isEmpty()) {
+                    miPanelDeGrupos.setGroupMembers(group.getMemberNames());
+                }
                 miPanelDeGrupos.setPreferredSize(new Dimension(900, 640));
+
+                // Registrar envío de mensajes desde el panel hacia el servidor
+                miPanelDeGrupos.setOnSendGroupMessageListener(msg -> {
+                    try {
+                        client.sendGroupMessage(group.getGroupId(), msg);
+                    } catch (IOException ex) {
+                        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(dashboardWindow, "Error enviando mensaje de grupo: " + ex.getMessage()));
+                    }
+                });
+
+                // Guardar panel abierto para recibir mensajes en tiempo real
+                openGroupPanels.put(group.getGroupId(), miPanelDeGrupos);
 
                 JDialog ventanaFlotante = new JDialog(dashboardWindow, group.getName(), false);
                 ventanaFlotante.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
@@ -257,9 +308,44 @@ public class Main {
                 ventanaFlotante.setSize(920, 660);
                 ventanaFlotante.setMinimumSize(new Dimension(760, 560));
                 ventanaFlotante.setLocationRelativeTo(dashboardWindow);
+                ventanaFlotante.addWindowListener(new java.awt.event.WindowAdapter() {
+                    @Override
+                    public void windowClosed(java.awt.event.WindowEvent e) {
+                        openGroupPanels.remove(group.getGroupId());
+                    }
+                    @Override
+                    public void windowClosing(java.awt.event.WindowEvent e) {
+                        openGroupPanels.remove(group.getGroupId());
+                    }
+                });
                 ventanaFlotante.setVisible(true);
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(dashboardWindow, "No se pudo abrir la ventana de grupo: " + ex.getMessage());
+            }
+        });
+
+        dashboardWindow.setOnCreateGroupListener((groupName, invitedUserIds) -> {
+            try {
+                Map<String, Object> resp = client.createGroup(groupName, invitedUserIds);
+                if (Protocol.RES_OK.equals(String.valueOf(resp.get("status")))) {
+                    int gid = -1;
+                    Object g = resp.get("groupId");
+                    if (g instanceof Number) gid = ((Number) g).intValue();
+                    List<String> memberNames = new ArrayList<>();
+                    memberNames.add(session.getUsername());
+                    for (Map<String, Object> friend : session.getFriends()) {
+                        int friendId = ((Number) friend.get("id")).intValue();
+                        if (invitedUserIds.contains(friendId)) {
+                            memberNames.add(String.valueOf(friend.get("username")));
+                        }
+                    }
+                    DashboardWindow.GroupItem created = new DashboardWindow.GroupItem(groupName, invitedUserIds.size() + 1, false, gid, memberNames);
+                    dashboardWindow.addGroup(created);
+                } else {
+                    JOptionPane.showMessageDialog(dashboardWindow, String.valueOf(resp.getOrDefault("message", "No se pudo crear el grupo")));
+                }
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(dashboardWindow, "Error al crear grupo: " + ex.getMessage());
             }
         });
         dashboardWindow.addWindowListener(new java.awt.event.WindowAdapter() {
@@ -292,6 +378,23 @@ public class Main {
         chatModal.setVisible(true);
     }
 
+    private void sendFriendRequestToUser(DashboardWindow.UserItem user) {
+        try {
+            Map<String, Object> response = client.sendFriendRequest(user.getUserId());
+            if (Protocol.RES_OK.equals(String.valueOf(response.get("status")))) {
+                JOptionPane.showMessageDialog(dashboardWindow,
+                        "Solicitud de amistad enviada a " + user.getName() + ".",
+                        "Invitación enviada",
+                        JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(dashboardWindow,
+                        String.valueOf(response.getOrDefault("message", "No se pudo enviar la solicitud de amistad")));
+            }
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(dashboardWindow, "Error de conexión: " + ex.getMessage());
+        }
+    }
+
     private void handleServerMessage(Client activeClient, Map<String, Object> message) {
         if (activeClient != client) {
             return;
@@ -303,10 +406,14 @@ public class Main {
         String status = String.valueOf(message.get("status"));
         if (Protocol.RES_NEW_MESSAGE.equals(status)) {
             handleIncomingMessage(message);
-        } else if (Protocol.RES_USER_LIST.equals(status)) {
-            SessionData updated = new SessionData();
-            updated.absorb(message);
-            refreshDashboardData(updated);
+        } else if (Protocol.RES_FRIEND_LIST.equals(status)
+                || Protocol.RES_GROUP_LIST.equals(status)
+                || Protocol.RES_USER_LIST.equals(status)
+                || Protocol.RES_FRIEND_INVITE_LIST.equals(status)) {
+            if (session != null) {
+                session.absorb(message);
+                refreshDashboardData(session);
+            }
         }
     }
 
@@ -322,6 +429,22 @@ public class Main {
                     "Mensaje general",
                     JOptionPane.INFORMATION_MESSAGE);
             return;
+        }
+
+        if ("group".equals(type)) {
+            int groupId = ((Number) message.getOrDefault("groupId", -1)).intValue();
+            ui.PanelGrupos panel = openGroupPanels.get(groupId);
+            if (panel != null) {
+                panel.addMessage(content, senderName, senderId == session.getUserId());
+                return;
+            } else {
+                // Notificar con dialog por defecto y actualizar badge
+                JOptionPane.showMessageDialog(dashboardWindow,
+                        senderName + " (grupo): " + content,
+                        "Mensaje de grupo",
+                        JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
         }
 
         updateConversation(senderId, senderName, content, true);
@@ -350,8 +473,28 @@ public class Main {
             userNamesById.put(((Number) user.get("id")).intValue(), String.valueOf(user.get("username")));
         }
 
-        List<DashboardWindow.UserItem> users = new ArrayList<>();
+        List<DashboardWindow.FriendConversation> friendConversations = new ArrayList<>();
+        for (Map<String, Object> friend : data.getFriends()) {
+            int friendId = ((Number) friend.get("id")).intValue();
+            String friendName = String.valueOf(friend.get("username"));
+            boolean online = Boolean.TRUE.equals(friend.get("online"));
+            DashboardWindow.FriendConversation existing = conversationsByUserId.get(friendId);
+            if (existing != null) {
+                friendConversations.add(existing);
+            } else {
+                friendConversations.add(new DashboardWindow.FriendConversation(
+                        friendName,
+                        "Toca para chatear",
+                        LocalTime.now().format(TIME_FORMAT),
+                        false,
+                        online,
+                        friendId
+                ));
+            }
+        }
+        dashboardWindow.setFriendConversations(friendConversations);
 
+        List<DashboardWindow.UserItem> users = new ArrayList<>();
         for (Map<String, Object> user : data.getUsers()) {
             users.add(new DashboardWindow.UserItem(
                     String.valueOf(user.get("username")),
@@ -359,24 +502,35 @@ public class Main {
                     ((Number) user.get("id")).intValue()
             ));
         }
-
         dashboardWindow.setAllUsers(users);
 
         List<DashboardWindow.GroupItem> groups = new ArrayList<>();
         for (Map<String, Object> group : data.getGroups()) {
+            List<String> memberNames = new ArrayList<>();
+            Object rawMembers = group.get("members");
+            if (rawMembers instanceof List<?> membersList) {
+                for (Object item : membersList) {
+                    memberNames.add(String.valueOf(item));
+                }
+            }
             groups.add(new DashboardWindow.GroupItem(
                     String.valueOf(group.get("name")),
-                    0,
+                    group.containsKey("memberCount") ? ((Number) group.get("memberCount")).intValue() : 0,
                     false,
-                    ((Number) group.get("id")).intValue()
+                    ((Number) group.get("id")).intValue(),
+                    memberNames
             ));
         }
         dashboardWindow.setGroups(groups);
         dashboardWindow.setInvitations(new ArrayList<>());
-
-        if (conversationsByUserId.isEmpty()) {
-            dashboardWindow.setFriendConversations(new ArrayList<>());
+        List<DashboardWindow.FriendInvitation> friendInvites = new ArrayList<>();
+        for (Map<String, Object> invite : data.getFriendInvites()) {
+            int requesterId = invite.get("requesterId") instanceof Number ? ((Number) invite.get("requesterId")).intValue() : -1;
+            String requesterName = String.valueOf(invite.getOrDefault("requesterName", "Usuario"));
+            boolean incoming = Boolean.TRUE.equals(invite.get("incoming"));
+            friendInvites.add(new DashboardWindow.FriendInvitation(requesterName, requesterId, incoming));
         }
+        dashboardWindow.setFriendInvitations(friendInvites);
     }
 
     private void closeClientQuietly(Client activeClient) {

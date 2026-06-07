@@ -11,6 +11,7 @@ import utils.Logger;
 import java.io.*;
 import java.net.Socket;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,8 +84,23 @@ public class ClientHandler implements Runnable {
                     case Protocol.CMD_GET_FRIENDS:
                         handleGetFriends();
                         break;
+                    case Protocol.CMD_GET_GROUPS:
+                        handleGetGroups();
+                        break;
+                    case Protocol.CMD_GET_FRIEND_INVITES:
+                        handleGetFriendInvites();
+                        break;
                     case Protocol.CMD_SEND_FRIEND_MSG:
                         handleSendFriendMsg(data);
+                        break;
+                    case Protocol.CMD_SEND_FRIEND_REQUEST:
+                        handleSendFriendRequest(data);
+                        break;
+                    case Protocol.CMD_ACCEPT_FRIEND_REQUEST:
+                        handleAcceptFriendRequest(data);
+                        break;
+                    case Protocol.CMD_REJECT_FRIEND_REQUEST:
+                        handleRejectFriendRequest(data);
                         break;
                     case Protocol.CMD_SEND_GROUP_MSG:
                         handleSendGroupMsg(data);
@@ -136,6 +152,7 @@ public class ClientHandler implements Runnable {
             sendGroupList();
             sendAllUsers();
             sendPendingMessages();
+            sendFriendInviteList();
             scheduleUserListBroadcast();
         } else {
             loginAttempts++;
@@ -191,6 +208,10 @@ public class ClientHandler implements Runnable {
         sendPendingMessages();
     }
 
+    private void handleGetFriendInvites() throws SQLException, IOException {
+        sendFriendInviteList();
+    }
+
     private void handleGetAllUsers() throws SQLException, IOException {
         // Obtener todos los usuarios menos el actual
         UserManager um = new UserManager(); // mejor crear un UserDAO
@@ -200,6 +221,10 @@ public class ClientHandler implements Runnable {
         response.put("status", Protocol.RES_USER_LIST);
         response.put("users", users);
         sendMessage(response);
+    }
+
+    private void handleGetGroups() throws SQLException, IOException {
+        sendGroupList();
     }
 
     private List<Map<String, Object>> getAllUsersExcept(int userId) throws SQLException {
@@ -252,6 +277,57 @@ public class ClientHandler implements Runnable {
         sendMessage(response);
     }
 
+    private void sendFriendInviteList() throws SQLException, IOException {
+        FriendshipManager fm = new FriendshipManager();
+        List<Map<String, Object>> invites = fm.getPendingRequests(currentUser.getId());
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", Protocol.RES_FRIEND_INVITE_LIST);
+        response.put("invites", invites);
+        sendMessage(response);
+    }
+
+    private void sendFriendInviteUpdateToUser(int userId) {
+        synchronized (connectedClients) {
+            try {
+                User target = new UserDAO().findById(userId);
+                if (target == null) return;
+                ClientHandler handler = connectedClients.get(target.getUsername());
+                if (handler != null) {
+                    handler.sendFriendInviteList();
+                }
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private void sendFriendListToUser(int userId) {
+        synchronized (connectedClients) {
+            try {
+                User target = new UserDAO().findById(userId);
+                if (target == null) return;
+                ClientHandler handler = connectedClients.get(target.getUsername());
+                if (handler != null) {
+                    handler.sendFriendList();
+                }
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private void sendGroupListToUser(int userId) {
+        synchronized (connectedClients) {
+            try {
+                User target = new UserDAO().findById(userId);
+                if (target == null) return;
+                ClientHandler handler = connectedClients.get(target.getUsername());
+                if (handler != null) {
+                    handler.sendGroupList();
+                }
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
     private void sendGroupList() throws SQLException, IOException {
         GroupManager gm = new GroupManager();
         List<models.Group> groups = gm.getGroupsForUser(currentUser.getId());
@@ -260,6 +336,13 @@ public class ClientHandler implements Runnable {
             Map<String, Object> map = new HashMap<>();
             map.put("id", g.getId());
             map.put("name", g.getName());
+            List<User> members = gm.getGroupMembers(g.getId());
+            map.put("memberCount", members.size());
+            List<String> memberNames = new java.util.ArrayList<>();
+            for (User member : members) {
+                memberNames.add(member.getUsername());
+            }
+            map.put("members", memberNames);
             groupList.add(map);
         }
         Map<String, Object> response = new HashMap<>();
@@ -317,6 +400,39 @@ public class ClientHandler implements Runnable {
         sendMessage(response);
     }
 
+    private void handleSendFriendRequest(Map<String, Object> data) throws SQLException, IOException {
+        int friendId = ((Number) data.get("friendId")).intValue();
+        FriendshipManager fm = new FriendshipManager();
+        boolean success = fm.sendFriendRequest(currentUser.getId(), friendId);
+        if (!success) {
+            sendError("No se pudo enviar la solicitud de amistad. Ya existe o el usuario ya es tu amigo.");
+            return;
+        }
+        sendOk();
+        sendFriendInviteUpdateToUser(friendId);
+        sendFriendInviteList();
+    }
+
+    private void handleAcceptFriendRequest(Map<String, Object> data) throws SQLException, IOException {
+        int requesterId = ((Number) data.get("requesterId")).intValue();
+        FriendshipManager fm = new FriendshipManager();
+        fm.acceptRequest(requesterId, currentUser.getId());
+        sendOk();
+        sendFriendList();
+        sendFriendInviteList();
+        sendFriendListToUser(requesterId);
+        sendFriendInviteUpdateToUser(requesterId);
+    }
+
+    private void handleRejectFriendRequest(Map<String, Object> data) throws SQLException, IOException {
+        int requesterId = ((Number) data.get("requesterId")).intValue();
+        FriendshipManager fm = new FriendshipManager();
+        fm.rejectRequest(requesterId, currentUser.getId());
+        sendOk();
+        sendFriendInviteList();
+        sendFriendInviteUpdateToUser(requesterId);
+    }
+
     private void handleSendTempMsg(Map<String, Object> data) throws IOException {
         String content = (String) data.get("content");
         if (content == null || content.trim().isEmpty()) {
@@ -358,6 +474,7 @@ public class ClientHandler implements Runnable {
                     newMsg.put("status", Protocol.RES_NEW_MESSAGE);
                     newMsg.put("groupId", groupId);
                     newMsg.put("senderId", currentUser.getId());
+                    newMsg.put("senderUsername", currentUser.getUsername());
                     newMsg.put("content", content);
                     newMsg.put("type", "group");
                     ch.sendMessage(newMsg);
@@ -371,7 +488,8 @@ public class ClientHandler implements Runnable {
 
     private void handleCreateGroup(Map<String, Object> data) throws SQLException, IOException {
         String groupName = (String) data.get("groupName");
-        List<Integer> invitedUserIds = (List<Integer>) data.get("invitedUserIds");
+        Object rawInvited = data.get("invitedUserIds");
+        List<Integer> invitedUserIds = convertToIntegerList(rawInvited);
         GroupManager gm = new GroupManager();
         int groupId = gm.createGroup(groupName, currentUser.getId(), invitedUserIds);
         if (groupId != -1) {
@@ -379,9 +497,31 @@ public class ClientHandler implements Runnable {
             response.put("status", Protocol.RES_OK);
             response.put("groupId", groupId);
             sendMessage(response);
+            // Notificar inmediatamente a los usuarios agregados si están conectados
+            for (int userId : invitedUserIds) {
+                sendGroupListToUser(userId);
+            }
         } else {
-            sendError("No se pudo crear el grupo. Se requieren al menos 2 invitados.");
+            sendError("No se pudo crear el grupo. Verifica que hayas seleccionado al menos un amigo y que sean tus amigos aceptados.");
         }
+    }
+
+    private List<Integer> convertToIntegerList(Object rawList) {
+        List<Integer> result = new ArrayList<>();
+        if (!(rawList instanceof List<?> list)) {
+            return result;
+        }
+        for (Object item : list) {
+            if (item instanceof Number number) {
+                result.add(number.intValue());
+            } else if (item instanceof String text) {
+                try {
+                    result.add(Integer.parseInt(text));
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        return result;
     }
 
     private void handleAcceptGroupInvite(Map<String, Object> data) throws SQLException, IOException {

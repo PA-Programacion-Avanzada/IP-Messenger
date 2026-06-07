@@ -35,13 +35,20 @@ public class PanelGrupos extends JPanel {
 
     private boolean estado = true;
 
+    public interface OnSendGroupMessageListener {
+        void onSendGroupMessage(String message);
+    }
+
+    private OnSendGroupMessageListener onSendGroupMessageListener;
+
+    public void setOnSendGroupMessageListener(OnSendGroupMessageListener listener) {
+        this.onSendGroupMessageListener = listener;
+    }
+
     public PanelGrupos() {
         buildUI();
-        setGroupInfo("Grupo de prueba", 5);
-        setGroupMembers(List.of("Ana", "Luis", "María", "Pedro", "Sofía"));
-        addMessage("Hola equipo, aquí vamos con el resumen de hoy.", "Ana", false);
-        addMessage("Perfecto, estoy listo para revisar el avance.", "Yo", true);
-        addMessage("Recuerden que la reunión es a las 5 pm.", "Luis", false);
+        setGroupInfo("Grupo de chat", 0);
+        setGroupMembers(new ArrayList<>());
     }
 
     private void buildUI() {
@@ -226,12 +233,17 @@ public class PanelGrupos extends JPanel {
         if (text.isEmpty()) {
             return;
         }
+        // Enviar localmente
         addMessage(text, "Yo", true);
         messageInput.setText("");
         messageInput.requestFocus();
+        // Notificar al listener para que lo envíe al servidor
+        if (onSendGroupMessageListener != null) {
+            onSendGroupMessageListener.onSendGroupMessage(text);
+        }
     }
 
-    private void addMessage(String text, String sender, boolean own) {
+    public void addMessage(String text, String sender, boolean own) {
         JPanel wrapper = new JPanel(new BorderLayout());
         wrapper.setOpaque(false);
 

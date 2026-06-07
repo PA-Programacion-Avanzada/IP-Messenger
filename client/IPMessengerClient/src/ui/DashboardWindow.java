@@ -41,6 +41,7 @@ public class DashboardWindow extends JFrame {
     private OnSendTemporaryMessageListener onSendTemporaryMessageListener;
     private OnPendingMessagesSelectedListener onPendingMessagesSelectedListener;
     private OnFriendInvitationActionListener onFriendInvitationActionListener;
+    private OnCreateGroupListener onCreateGroupListener;
 
     // Clases internas para datos
     public static class FriendConversation {
@@ -73,18 +74,25 @@ public class DashboardWindow extends JFrame {
         private int memberCount;
         private boolean hasUpdate;
         private int groupId;
+        private java.util.List<String> memberNames;
 
-        public GroupItem(String name, int memberCount, boolean hasUpdate, int groupId) {
+        public GroupItem(String name, int memberCount, boolean hasUpdate, int groupId, java.util.List<String> memberNames) {
             this.name = name;
             this.memberCount = memberCount;
             this.hasUpdate = hasUpdate;
             this.groupId = groupId;
+            this.memberNames = memberNames;
+        }
+
+        public GroupItem(String name, int memberCount, boolean hasUpdate, int groupId) {
+            this(name, memberCount, hasUpdate, groupId, new java.util.ArrayList<>());
         }
 
         public String getName() { return name; }
         public int getMemberCount() { return memberCount; }
         public boolean hasUpdate() { return hasUpdate; }
         public int getGroupId() { return groupId; }
+        public java.util.List<String> getMemberNames() { return memberNames; }
     }
 
     public static class UserItem {
@@ -160,6 +168,10 @@ public class DashboardWindow extends JFrame {
         void onSendTemporaryMessage(String message, UserItem targetUser);
     }
 
+    public interface OnCreateGroupListener {
+        void onCreateGroup(String groupName, java.util.List<Integer> invitedUserIds);
+    }
+
     public interface OnPendingMessagesSelectedListener {
         void onPendingMessagesSelected();
     }
@@ -171,7 +183,6 @@ public class DashboardWindow extends JFrame {
 
     public DashboardWindow() {
         initUI();
-        seedFriendUiExamples();
         setTitle("IP Messenger - Dashboard");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1300, 800);
@@ -179,7 +190,8 @@ public class DashboardWindow extends JFrame {
     }
 
     private void seedFriendUiExamples() {
-        setFriendInvitations(new ArrayList<>());
+        setFriendInvitations(createSampleFriendInvitations());
+        setInvitations(createSampleGroupInvitations());
         setPendingFriendChatCount(2);
     }
 
@@ -473,7 +485,59 @@ public class DashboardWindow extends JFrame {
                 JOptionPane.showMessageDialog(this, "Selecciona un grupo");
             }
         });
-        panel.add(viewGroupBtn, BorderLayout.SOUTH);
+
+        JButton createGroupBtn = new JButton("Crear Grupo");
+        createGroupBtn.setBackground(new Color(40, 167, 69));
+        createGroupBtn.setForeground(Color.WHITE);
+        createGroupBtn.setFocusPainted(false);
+        createGroupBtn.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
+        createGroupBtn.addActionListener(e -> {
+            // Diálogo para crear grupo
+            JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Crear Grupo", true);
+            dlg.setLayout(new BorderLayout(8,8));
+            JPanel body = new JPanel(new BorderLayout(8,8));
+            JTextField nameField = new JTextField();
+            nameField.setBorder(BorderFactory.createTitledBorder("Nombre del grupo"));
+            body.add(nameField, BorderLayout.NORTH);
+
+            DefaultListModel<FriendConversation> pickModel = new DefaultListModel<>();
+            for (int i = 0; i < friendListModel.size(); i++) pickModel.addElement(friendListModel.get(i));
+            JList<FriendConversation> pickList = new JList<>(pickModel);
+            pickList.setCellRenderer(new FriendListRenderer());
+            pickList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+            JScrollPane pickScroll = new JScrollPane(pickList);
+            pickScroll.setBorder(BorderFactory.createTitledBorder("Selecciona amigos"));
+            body.add(pickScroll, BorderLayout.CENTER);
+
+            JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            JButton cancel = new JButton("Cancelar");
+            JButton create = new JButton("Crear");
+            create.setBackground(new Color(0, 123, 255));
+            create.setForeground(Color.WHITE);
+            create.setFocusPainted(false);
+            cancel.addActionListener(ev -> dlg.dispose());
+            create.addActionListener(ev -> {
+                String gname = nameField.getText().trim();
+                java.util.List<Integer> ids = new java.util.ArrayList<>();
+                for (FriendConversation fc : pickList.getSelectedValuesList()) ids.add(fc.getFriendId());
+                if (gname.isEmpty()) { JOptionPane.showMessageDialog(dlg, "Especifica un nombre para el grupo"); return; }
+                if (ids.isEmpty()) { JOptionPane.showMessageDialog(dlg, "Selecciona al menos un amigo para invitar"); return; }
+                if (onCreateGroupListener != null) onCreateGroupListener.onCreateGroup(gname, ids);
+                dlg.dispose();
+            });
+            footer.add(cancel); footer.add(create);
+            dlg.add(body, BorderLayout.CENTER);
+            dlg.add(footer, BorderLayout.SOUTH);
+            dlg.setSize(420,480);
+            dlg.setLocationRelativeTo(this);
+            dlg.setVisible(true);
+        });
+
+        JPanel southPanel = new JPanel(new GridLayout(2,1,6,6));
+        southPanel.setOpaque(false);
+        southPanel.add(viewGroupBtn);
+        southPanel.add(createGroupBtn);
+        panel.add(southPanel, BorderLayout.SOUTH);
 
         return panel;
     }
@@ -588,9 +652,6 @@ public class DashboardWindow extends JFrame {
     // Métodos públicos para actualizar datos
     public void setFriendConversations(List<FriendConversation> conversations) {
         friendListModel.clear();
-        if (conversations.isEmpty()) {
-            conversations = createSampleFriendConversations();
-        }
         for (FriendConversation fc : conversations) {
             friendListModel.addElement(fc);
         }
@@ -600,9 +661,6 @@ public class DashboardWindow extends JFrame {
 
     public void setGroups(List<GroupItem> groups) {
         groupListModel.clear();
-        if (groups.isEmpty()) {
-            groups = createSampleGroups();
-        }
         for (GroupItem g : groups) {
             groupListModel.addElement(g);
         }
@@ -612,9 +670,6 @@ public class DashboardWindow extends JFrame {
 
     public void setAllUsers(List<UserItem> users) {
         allUsersPanel.removeAll();
-        if (users.isEmpty()) {
-            users = createSampleUsers();
-        }
         for (UserItem user : users) {
             allUsersPanel.add(createUserRow(user));
             allUsersPanel.add(Box.createRigidArea(new Dimension(0, 4)));
@@ -686,15 +741,13 @@ public class DashboardWindow extends JFrame {
 
     public void setInvitations(List<GroupInvitation> invitations) {
         groupInvitationsPanel.removeAll();
-        if (invitations.isEmpty()) {
-            invitations = createSampleGroupInvitations();
-        }
-        for (GroupInvitation inv : invitations) {
-            groupInvitationsPanel.add(createInvitationCard(inv));
-            groupInvitationsPanel.add(Box.createRigidArea(new Dimension(0, 8)));
-        }
-        if (invitations.isEmpty()) {
+        if (invitations == null || invitations.isEmpty()) {
             groupInvitationsPanel.add(createEmptyState("Sin invitaciones de grupo"));
+        } else {
+            for (GroupInvitation inv : invitations) {
+                groupInvitationsPanel.add(createInvitationCard(inv));
+                groupInvitationsPanel.add(Box.createRigidArea(new Dimension(0, 8)));
+            }
         }
         groupInvitationsPanel.revalidate();
         groupInvitationsPanel.repaint();
@@ -702,15 +755,13 @@ public class DashboardWindow extends JFrame {
 
     public void setFriendInvitations(List<FriendInvitation> invitations) {
         friendInvitationsPanel.removeAll();
-        if (invitations.isEmpty()) {
-            invitations = createSampleFriendInvitations();
-        }
-        for (FriendInvitation inv : invitations) {
-            friendInvitationsPanel.add(createFriendInvitationCard(inv));
-            friendInvitationsPanel.add(Box.createRigidArea(new Dimension(0, 8)));
-        }
-        if (invitations.isEmpty()) {
+        if (invitations == null || invitations.isEmpty()) {
             friendInvitationsPanel.add(createEmptyState("Sin solicitudes de amistad"));
+        } else {
+            for (FriendInvitation inv : invitations) {
+                friendInvitationsPanel.add(createFriendInvitationCard(inv));
+                friendInvitationsPanel.add(Box.createRigidArea(new Dimension(0, 8)));
+            }
         }
         friendInvitationsPanel.revalidate();
         friendInvitationsPanel.repaint();
@@ -901,6 +952,13 @@ public class DashboardWindow extends JFrame {
         groupBadgeLabel.setVisible(count > 0);
     }
 
+    public void addGroup(GroupItem group) {
+        if (groupListModel == null) groupListModel = new DefaultListModel<>();
+        groupListModel.addElement(group);
+        int updateCount = (int) java.util.Collections.list(groupListModel.elements()).stream().filter(g -> g.hasUpdate()).count();
+        updateGroupBadge(updateCount);
+    }
+
     // Setters de listeners
     public void setOnFriendChatSelectedListener(OnFriendChatSelectedListener listener) { this.onFriendChatSelectedListener = listener; }
     public void setOnGroupSelectedListener(OnGroupSelectedListener listener) { this.onGroupSelectedListener = listener; }
@@ -909,6 +967,7 @@ public class DashboardWindow extends JFrame {
     public void setOnSendTemporaryMessageListener(OnSendTemporaryMessageListener listener) { this.onSendTemporaryMessageListener = listener; }
     public void setOnPendingMessagesSelectedListener(OnPendingMessagesSelectedListener listener) { this.onPendingMessagesSelectedListener = listener; }
     public void setOnFriendInvitationActionListener(OnFriendInvitationActionListener listener) { this.onFriendInvitationActionListener = listener; }
+    public void setOnCreateGroupListener(OnCreateGroupListener listener) { this.onCreateGroupListener = listener; }
 
     // Método main para prueba visual
     public static void main(String[] args) {

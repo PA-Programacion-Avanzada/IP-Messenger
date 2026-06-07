@@ -48,6 +48,17 @@ public class GroupMemberDAO {
         return 0;
     }
 
+    public List<Integer> getAcceptedGroupIds(int userId) throws SQLException {
+        List<Integer> ids = new ArrayList<>();
+        String sql = "SELECT group_id FROM GroupMembers WHERE user_id = ? AND status = 'accepted'";
+        try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) ids.add(rs.getInt("group_id"));
+        }
+        return ids;
+    }
+
     public void deleteMember(int groupId, int userId) throws SQLException {
         String sql = "DELETE FROM GroupMembers WHERE group_id = ? AND user_id = ?";
         try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {

@@ -1,5 +1,6 @@
 package logic;
 
+import database.FriendshipDAO;
 import database.GroupDAO;
 import database.GroupMemberDAO;
 import database.UserDAO;
@@ -15,16 +16,27 @@ public class GroupManager {
     private UserDAO userDAO = new UserDAO();
 
     public int createGroup(String name, int creatorId, List<Integer> invitedUserIds) throws SQLException {
-        // Se necesita al menos 2 invitados para que junto al creador sumen 3
-        if (invitedUserIds.size() < 2) return -1;
+        // El grupo debe tener al menos un amigo invitado para que el creador pueda comenzar
+        if (invitedUserIds == null || invitedUserIds.isEmpty()) return -1;
+
+        FriendshipDAO friendshipDAO = new FriendshipDAO();
+        for (int uid : invitedUserIds) {
+            if (!friendshipDAO.areFriends(creatorId, uid)) {
+                return -1;
+            }
+        }
+
         int groupId = groupDAO.createGroup(name, creatorId);
         if (groupId == -1) return -1;
+
         // El creador se agrega como accepted
         memberDAO.inviteMember(groupId, creatorId);
         memberDAO.updateStatus(groupId, creatorId, "accepted");
-        // Invitar a los demás
+
+        // Agregar a los demás miembros directamente como aceptados
         for (int uid : invitedUserIds) {
             memberDAO.inviteMember(groupId, uid);
+            memberDAO.updateStatus(groupId, uid, "accepted");
         }
         return groupId;
     }
@@ -58,13 +70,15 @@ public class GroupManager {
     }
 
     public List<Group> getGroupsForUser(int userId) throws SQLException {
-        // Obtener grupos donde el usuario tiene status 'accepted' (o también 'invited'?)
-        // Simplificado: buscamos en GroupMembers los grupos donde user_id = userId y status = 'accepted'
-        // Luego cargamos el Group desde GroupDAO
-        // Como no tenemos método directo, hacemos consulta manual en GroupMemberDAO
-        // Añadiremos un método en GroupMemberDAO: getGroupsByUser(userId, status)
-        // Por ahora dejamos placeholder
-        return new ArrayList<>();
+        List<Integer> groupIds = memberDAO.getAcceptedGroupIds(userId);
+        List<Group> groups = new ArrayList<>();
+        for (int groupId : groupIds) {
+            Group group = groupDAO.findById(groupId);
+            if (group != null) {
+                groups.add(group);
+            }
+        }
+        return groups;
     }
 
     public List<User> getGroupMembers(int groupId) throws SQLException {

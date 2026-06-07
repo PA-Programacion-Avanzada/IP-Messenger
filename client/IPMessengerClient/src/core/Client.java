@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 import java.net.InetSocketAddress;
 
 public class Client {
-    public static final int DEFAULT_PORT = 12345;
+    public static final int DEFAULT_PORT = 12346;
     public static final int SOCKET_CONNECT_TIMEOUT_MS = 5_000;
     private static final int RESPONSE_TIMEOUT_SECONDS = 20;
 
@@ -111,6 +111,7 @@ public class Client {
             pendingBootstrap.add(Protocol.RES_GROUP_LIST);
             pendingBootstrap.add(Protocol.RES_USER_LIST);
             pendingBootstrap.add(Protocol.RES_PENDING_MESSAGES);
+            pendingBootstrap.add(Protocol.RES_FRIEND_INVITE_LIST);
 
             while (!pendingBootstrap.isEmpty()) {
                 Map<String, Object> bootstrapMessage = waitForResponse();
@@ -134,6 +135,42 @@ public class Client {
         Map<String, Object> data = new HashMap<>();
         data.put("content", content);
         return sendCommand(Protocol.CMD_SEND_TEMP_MSG, data);
+    }
+
+    public Map<String, Object> sendGroupMessage(int groupId, String content) throws IOException {
+        Map<String, Object> data = new HashMap<>();
+        data.put("groupId", groupId);
+        data.put("content", content);
+        return sendCommand(Protocol.CMD_SEND_GROUP_MSG, data);
+    }
+
+    public Map<String, Object> sendFriendRequest(int friendId) throws IOException {
+        Map<String, Object> data = new HashMap<>();
+        data.put("friendId", friendId);
+        return sendCommand(Protocol.CMD_SEND_FRIEND_REQUEST, data);
+    }
+
+    public Map<String, Object> acceptFriendRequest(int requesterId) throws IOException {
+        Map<String, Object> data = new HashMap<>();
+        data.put("requesterId", requesterId);
+        return sendCommand(Protocol.CMD_ACCEPT_FRIEND_REQUEST, data);
+    }
+
+    public Map<String, Object> rejectFriendRequest(int requesterId) throws IOException {
+        Map<String, Object> data = new HashMap<>();
+        data.put("requesterId", requesterId);
+        return sendCommand(Protocol.CMD_REJECT_FRIEND_REQUEST, data);
+    }
+
+    public Map<String, Object> createGroup(String groupName, java.util.List<Integer> invitedUserIds) throws IOException {
+        Map<String, Object> data = new HashMap<>();
+        data.put("groupName", groupName);
+        data.put("invitedUserIds", invitedUserIds);
+        return sendCommand(Protocol.CMD_CREATE_GROUP, data);
+    }
+
+    public Map<String, Object> getGroups() throws IOException {
+        return sendCommand(Protocol.CMD_GET_GROUPS, new HashMap<>());
     }
 
     public Map<String, Object> sendCommand(String command, Map<String, Object> data) throws IOException {
@@ -164,7 +201,11 @@ public class Client {
                 Map<String, Object> message = receiveMessage();
                 String status = String.valueOf(message.get("status"));
                 if (!bootstrapInProgress
-                        && (Protocol.RES_NEW_MESSAGE.equals(status) || Protocol.RES_USER_LIST.equals(status))) {
+                        && (Protocol.RES_NEW_MESSAGE.equals(status)
+                            || Protocol.RES_USER_LIST.equals(status)
+                            || Protocol.RES_FRIEND_LIST.equals(status)
+                            || Protocol.RES_GROUP_LIST.equals(status)
+                            || Protocol.RES_FRIEND_INVITE_LIST.equals(status))) {
                     MessageListener listener = messageListener;
                     if (listener != null) {
                         listener.onMessage(message);

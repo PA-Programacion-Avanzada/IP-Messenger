@@ -15,12 +15,17 @@ public class Protocol {
     public static final String CMD_INVITE_TO_GROUP = "INVITE_TO_GROUP";
     public static final String CMD_ACCEPT_GROUP_INVITE = "ACCEPT_GROUP_INVITE";
     public static final String CMD_REJECT_GROUP_INVITE = "REJECT_GROUP_INVITE";
+    public static final String CMD_SEND_FRIEND_REQUEST = "SEND_FRIEND_REQUEST";
+    public static final String CMD_ACCEPT_FRIEND_REQUEST = "ACCEPT_FRIEND_REQUEST";
+    public static final String CMD_REJECT_FRIEND_REQUEST = "REJECT_FRIEND_REQUEST";
+    public static final String CMD_GET_FRIEND_INVITES = "GET_FRIEND_INVITES";
     public static final String CMD_LEAVE_GROUP = "LEAVE_GROUP";
     public static final String CMD_GET_PENDING_MSGS = "GET_PENDING_MSGS";
     public static final String CMD_MARK_MSG_READ = "MARK_MSG_READ";
 
     // Respuestas del servidor
     public static final String RES_OK = "OK";
+    public static final String RES_FRIEND_INVITE_LIST = "FRIEND_INVITE_LIST";
     public static final String RES_ERROR = "ERROR";
     public static final String RES_LOGIN_SUCCESS = "LOGIN_SUCCESS";
     public static final String RES_LOGIN_FAIL = "LOGIN_FAIL";

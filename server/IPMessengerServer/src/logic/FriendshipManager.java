@@ -5,7 +5,9 @@ import database.UserDAO;
 import models.User;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class FriendshipManager {
     private FriendshipDAO friendshipDAO = new FriendshipDAO();
@@ -13,19 +15,60 @@ public class FriendshipManager {
 
     public boolean sendFriendRequest(int userId, int friendId) throws SQLException {
         if (userId == friendId) return false;
+        if (friendshipDAO.areFriends(userId, friendId)) return false;
+        String currentStatus = friendshipDAO.getFriendshipStatus(userId, friendId);
+        if ("pending".equals(currentStatus) || "accepted".equals(currentStatus)) {
+            return false;
+        }
+        String reverseStatus = friendshipDAO.getFriendshipStatus(friendId, userId);
+        if ("pending".equals(reverseStatus)) {
+            acceptRequest(friendId, userId);
+            return true;
+        }
         friendshipDAO.sendRequest(userId, friendId);
         return true;
     }
 
     public void acceptRequest(int userId, int friendId) throws SQLException {
         friendshipDAO.updateStatus(userId, friendId, "accepted");
-        // también la inversa: si la solicitud fue de friendId a userId, también aceptar
-        friendshipDAO.updateStatus(friendId, userId, "accepted");
+        if (friendshipDAO.friendshipExists(friendId, userId)) {
+            friendshipDAO.updateStatus(friendId, userId, "accepted");
+        } else {
+            friendshipDAO.createFriendship(friendId, userId, "accepted");
+        }
     }
 
-    public void rejectRequest(int userId, int friendId) throws SQLException {
+    public boolean rejectRequest(int userId, int friendId) throws SQLException {
         friendshipDAO.updateStatus(userId, friendId, "rejected");
+        if (friendshipDAO.friendshipExists(friendId, userId)) {
+            friendshipDAO.updateStatus(friendId, userId, "rejected");
+        }
+        return true;
     }
+
+    public List<Map<String, Object>> getPendingRequests(int userId) throws SQLException {
+        List<Map<String, Object>> requests = new ArrayList<>();
+        for (int requesterId : friendshipDAO.getIncomingRequestIds(userId)) {
+            User requester = userDAO.findById(requesterId);
+            if (requester != null) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("requesterId", requester.getId());
+                map.put("requesterName", requester.getUsername());
+                map.put("incoming", true);
+                requests.add(map);
+            }
+        }
+        for (int targetId : friendshipDAO.getOutgoingRequestIds(userId)) {
+            User target = userDAO.findById(targetId);
+            if (target != null) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("requesterId", target.getId());
+                map.put("requesterName", target.getUsername());
+                map.put("incoming", false);
+                requests.add(map);
+            }
+        }
+        return requests;    }
 
     public List<User> getFriends(int userId) throws SQLException {
         List<Integer> friendIds = friendshipDAO.getFriendsIds(userId);
