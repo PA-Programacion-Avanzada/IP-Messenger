@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.swing.*;
+import java.awt.Dimension;
 import network.Protocol;
 import ui.*;
 
@@ -242,6 +243,25 @@ public class Main {
         });
 
         dashboardWindow.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        dashboardWindow.setOnGroupSelectedListener(group -> {
+            // Abrir PanelGrupos en un diálogo flotante
+            try {
+                PanelGrupos miPanelDeGrupos = new PanelGrupos();
+                miPanelDeGrupos.setGroupInfo(group.getName(), group.getMemberCount());
+                miPanelDeGrupos.setPreferredSize(new Dimension(900, 640));
+
+                JDialog ventanaFlotante = new JDialog(dashboardWindow, group.getName(), false);
+                ventanaFlotante.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+                ventanaFlotante.getContentPane().add(miPanelDeGrupos);
+                ventanaFlotante.pack();
+                ventanaFlotante.setSize(920, 660);
+                ventanaFlotante.setMinimumSize(new Dimension(760, 560));
+                ventanaFlotante.setLocationRelativeTo(dashboardWindow);
+                ventanaFlotante.setVisible(true);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(dashboardWindow, "No se pudo abrir la ventana de grupo: " + ex.getMessage());
+            }
+        });
         dashboardWindow.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
