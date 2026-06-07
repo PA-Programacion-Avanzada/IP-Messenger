@@ -16,9 +16,11 @@ import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.net.InetSocketAddress;
 
 public class Client {
-    private static final int DEFAULT_PORT = 12345;
+    public static final int DEFAULT_PORT = 12345;
+    public static final int SOCKET_CONNECT_TIMEOUT_MS = 5_000;
     private static final int RESPONSE_TIMEOUT_SECONDS = 20;
 
     private Socket socket;
@@ -30,10 +32,15 @@ public class Client {
     private volatile boolean bootstrapInProgress;
 
     public void connect(String host, int port) throws IOException {
+        connect(host, port, SOCKET_CONNECT_TIMEOUT_MS);
+    }
+
+    public void connect(String host, int port, int timeoutMs) throws IOException {
         if (socket != null && !socket.isClosed()) {
             return;
         }
-        socket = new Socket(host, port);
+        socket = new Socket();
+        socket.connect(new InetSocketAddress(host, port), timeoutMs);
         input = socket.getInputStream();
         output = socket.getOutputStream();
         readerThread = new Thread(this::readLoop, "ip-messenger-client-reader");

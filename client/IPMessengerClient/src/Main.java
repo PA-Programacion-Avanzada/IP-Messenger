@@ -1,8 +1,10 @@
 package com.ipmessenger.client;
 
 import core.Client;
+import core.NetworkTask;
 import core.SessionData;
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -47,19 +49,55 @@ public class Main {
             return;
         }
 
-        Client loginClient = new Client();
+        // ----- DEBUG -----
+        System.out.println("[LOGIN] intentando en " + serverIp);
 
-        try {
-            SessionData loginSession = loginClient.login(serverIp, username, password);
-            loginClient.setMessageListener(message -> handleServerMessage(loginClient, message));
-            this.client = loginClient;
-            this.session = loginSession;
-            startWindow.dispose();
-            showDashboardWindow(serverIp);
-        } catch (IOException ex) {
-            startWindow.showError("No se pudo conectar al servidor: " + ex.getMessage());
-            closeClientQuietly(loginClient);
-        }
+        new NetworkTask<SessionData>() {
+            private Client loginClient;
+            private String host = serverIp;
+
+            @Override
+            protected SessionData doTask() throws Exception {
+                System.out.printf("[LOGIN] conectando a %s:%d …%n", host, Client.DEFAULT_PORT);
+                loginClient = new Client();
+                return loginClient.login(host, username, password);
+            }
+
+            @Override
+            protected void onSuccess(SessionData sessionData) {
+                System.out.println("[LOGIN] login exitoso → ventana Dashboard");
+
+                client     = loginClient;
+                session    = sessionData;
+
+                startWindow.dispose();
+                showDashboardWindow(host);
+            }
+
+            @Override
+            protected void propagateError(Throwable ex) {
+                Throwable cause = (ex instanceof ExecutionException && ex.getCause() != null)
+                        ? ex.getCause() : ex;
+
+                String mensaje;
+                if (cause instanceof java.net.ConnectException) {
+                    mensaje = "No se encontró ningún servidor en la IP " +
+                            host + ". Verifica que la aplicación esté ejecutándose.";
+                } else if (cause instanceof java.net.UnknownHostException) {
+                    mensaje = "La IP introducida (" + host + ") no es válida.";
+                } else if (cause instanceof java.net.SocketTimeoutException) {
+                    mensaje = "Conexión a " + host +
+                            " tardó más de " + (Client.SOCKET_CONNECT_TIMEOUT_MS / 1000) + " s.";
+                } else if (cause instanceof IOException) {
+                    mensaje = "No se pudo conectar al servidor: " + cause.getMessage();
+                } else {
+                    mensaje = "Error inesperado: " + cause.getMessage();
+                }
+
+                System.out.println("[LOGIN ERROR] " + mensaje);
+                startWindow.showError(mensaje);
+            }
+        }.execute();
     }
 
     private void onRegisterLinkClicked() {
@@ -70,25 +108,43 @@ public class Main {
                 return;
             }
 
-            Client registerClient = new Client();
-
-            try {
-                Map<String, Object> response = registerClient.register(ip, user, pass);
-                String status = String.valueOf(response.get("status"));
-                if (Protocol.RES_OK.equals(status)) {
-                    String message = String.valueOf(response.getOrDefault("message", "Registro exitoso."));
-                    JOptionPane.showMessageDialog(registerModal, message, "Éxito", JOptionPane.INFORMATION_MESSAGE);
-                    registerModal.dispose();
-                    startWindow.clearFields();
-                    startWindow.setVisible(true);
-                } else {
-                    registerModal.showError(String.valueOf(response.getOrDefault("message", "No se pudo registrar el usuario")));
+            new NetworkTask<Map<String,Object>>() {
+                @Override
+                protected Map<String,Object> doTask() throws Exception {
+                    Client regClient = new Client();
+                    return regClient.register(ip, user, pass);
                 }
-            } catch (IOException ex) {
-                registerModal.showError("No se pudo conectar al servidor: " + ex.getMessage());
-            } finally {
-                closeClientQuietly(registerClient);
-            }
+
+                @Override
+                protected void onSuccess(Map<String,Object> response) {
+                    String status = String.valueOf(response.get("status"));
+                    if (Protocol.RES_OK.equals(status)) {
+                        String message = String.valueOf(response.getOrDefault("message", "Registro exitoso."));
+                        JOptionPane.showMessageDialog(registerModal, message, "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                        registerModal.dispose();
+                        startWindow.clearFields();
+                        startWindow.setVisible(true);
+                    } else {
+                        registerModal.showError(String.valueOf(response.getOrDefault("message", "No se pudo registrar el usuario")));
+                    }
+                }
+
+                @Override
+                protected void propagateError(Throwable ex) {
+                    Throwable cause = (ex instanceof java.util.concurrent.ExecutionException && ex.getCause() != null)
+                            ? ex.getCause() : ex;
+
+                    String mensaje;
+                    if (cause instanceof java.net.ConnectException) {
+                        mensaje = "No se encontró servidor en la IP " + ip + ". Verifica que la aplicación esté ejecutándose.";
+                    } else if (cause instanceof java.net.UnknownHostException) {
+                        mensaje = "La IP introducida (" + ip + ") no es válida.";
+                    } else {
+                        mensaje = "No se pudo conectar al servidor: " + cause.getMessage();
+                    }
+                    registerModal.showError(mensaje);
+                }
+            }.execute();
         });
 
         registerModal.setOnCancelListener(() -> {
@@ -114,24 +170,42 @@ public class Main {
                 return;
             }
 
-            Client recoverClient = new Client();
-
-            try {
-                Map<String, Object> response = recoverClient.recoverPassword(ip, user, newPass);
-                String status = String.valueOf(response.get("status"));
-                if (Protocol.RES_OK.equals(status)) {
-                    recoverModal.showSuccess(String.valueOf(response.getOrDefault("message", "Contraseña restablecida.")));
-                    recoverModal.dispose();
-                    startWindow.clearFields();
-                    startWindow.setVisible(true);
-                } else {
-                    recoverModal.showError(String.valueOf(response.getOrDefault("message", "No se pudo restablecer la contraseña")));
+            new NetworkTask<Map<String,Object>>() {
+                @Override
+                protected Map<String,Object> doTask() throws Exception {
+                    Client recClient = new Client();
+                    return recClient.recoverPassword(ip, user, newPass);
                 }
-            } catch (IOException ex) {
-                recoverModal.showError("No se pudo conectar al servidor: " + ex.getMessage());
-            } finally {
-                closeClientQuietly(recoverClient);
-            }
+
+                @Override
+                protected void onSuccess(Map<String,Object> response) {
+                    String status = String.valueOf(response.get("status"));
+                    if (Protocol.RES_OK.equals(status)) {
+                        recoverModal.showSuccess(String.valueOf(response.getOrDefault("message", "Contraseña restablecida.")));
+                        recoverModal.dispose();
+                        startWindow.clearFields();
+                        startWindow.setVisible(true);
+                    } else {
+                        recoverModal.showError(String.valueOf(response.getOrDefault("message", "No se pudo restablecer la contraseña")));
+                    }
+                }
+
+                @Override
+                protected void propagateError(Throwable ex) {
+                    Throwable cause = (ex instanceof java.util.concurrent.ExecutionException && ex.getCause() != null)
+                            ? ex.getCause() : ex;
+
+                    String mensaje;
+                    if (cause instanceof java.net.ConnectException) {
+                        mensaje = "No se encontró servidor en la IP " + ip + ". Verifica que la aplicación esté ejecutándose.";
+                    } else if (cause instanceof java.net.UnknownHostException) {
+                        mensaje = "La IP introducida (" + ip + ") no es válida.";
+                    } else {
+                        mensaje = "No se pudo conectar al servidor: " + cause.getMessage();
+                    }
+                    recoverModal.showError(mensaje);
+                }
+            }.execute();
         });
 
         recoverModal.setOnCancelListener(() -> {

@@ -38,11 +38,18 @@ public class RecoverAccountModal extends JDialog {
 
     public RecoverAccountModal(Frame owner) {
         super(owner, "Restablecer contraseña", true);
+
         initUI();
+
         setMinimumSize(new Dimension(500, 540));
+        setPreferredSize(new Dimension(500, 540));
+        setMaximumSize(new Dimension(500, 540));
+
+        pack();
         setSize(500, 540);
         setLocationRelativeTo(owner);
         setResizable(false);
+
         setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
             @Override
@@ -57,12 +64,15 @@ public class RecoverAccountModal extends JDialog {
         mainPanel.setBackground(Color.WHITE);
         mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 25, 30));
 
+        // Dimensiones fijas: 500 × 540
+        Dimension dim = new Dimension(500, 540);
+        mainPanel.setPreferredSize(dim);
+        mainPanel.setMaximumSize(dim);
+
         // Cabecera con título y botón cerrar
         mainPanel.add(createHeaderPanel(), BorderLayout.NORTH);
-
         // Panel central con formulario
         mainPanel.add(createFormPanel(), BorderLayout.CENTER);
-
         // Panel inferior con enlace
         mainPanel.add(createFooterPanel(), BorderLayout.SOUTH);
 
@@ -126,7 +136,6 @@ public class RecoverAccountModal extends JDialog {
         helpPanel.setBackground(Color.WHITE);
         helpPanel.add(helpLabel);
         formPanel.add(helpPanel);
-        formPanel.add(Box.createRigidArea(new Dimension(0, 15)));
 
         // Campo Nueva Contraseña
         newPasswordField = new JPasswordField();
@@ -136,8 +145,11 @@ public class RecoverAccountModal extends JDialog {
                 BorderFactory.createEmptyBorder(8, 10, 8, 10)
         ));
         newPasswordField.setEchoChar('•');
+        setPasswordFieldSize(newPasswordField);
         formPanel.add(createFieldRow("Nueva Contraseña:", newPasswordField));
         formPanel.add(Box.createRigidArea(new Dimension(0, 30)));
+
+        formPanel.add(Box.createVerticalGlue());
 
         // Botón Restablecer (azul)
         resetButton = new JButton("Restablecer");
@@ -197,13 +209,18 @@ public class RecoverAccountModal extends JDialog {
 
     private JTextField createTextField(String placeholder) {
         JTextField field = new JTextField();
-        field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        field.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
-                BorderFactory.createEmptyBorder(8, 10, 8, 10)
-        ));
+        field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+
+        Border inner = BorderFactory.createLineBorder(new Color(200, 200, 200), 1);
+        Border outer = BorderFactory.createCompoundBorder(
+                inner,
+                BorderFactory.createEmptyBorder(6, 12, 6, 12)
+        );
+
+        field.setBorder(outer);
         field.setText(placeholder);
         field.setForeground(Color.GRAY);
+
         field.addFocusListener(new FocusAdapter() {
             @Override
             public void focusGained(FocusEvent e) {
@@ -220,15 +237,40 @@ public class RecoverAccountModal extends JDialog {
                 }
             }
         });
+
+        // Fijar altura
+        int height = 30;
+        field.setPreferredSize(new Dimension(0, height));
+        field.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
         return field;
+    }
+
+    private void setPasswordFieldSize(JPasswordField pf) {
+        pf.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        int h = 35;
+
+        // Borde interno
+        Border inner = BorderFactory.createLineBorder(new Color(200, 200, 200), 1);
+        pf.setBorder(BorderFactory.createCompoundBorder(
+                inner,
+                BorderFactory.createEmptyBorder(6, 12, 6, 12)
+        ));
+
+        pf.setPreferredSize(new Dimension(0, h));
+        pf.setMaximumSize(new Dimension(Integer.MAX_VALUE, h));
     }
 
     private JPanel createFieldRow(String labelText, JComponent field) {
         JPanel row = new JPanel(new BorderLayout(10, 0));
         row.setBackground(Color.WHITE);
+
         JLabel label = new JLabel(labelText);
         label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         label.setPreferredSize(new Dimension(110, 30));
+
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+        label.setMaximumSize(new Dimension(100, 30));
+
         row.add(label, BorderLayout.WEST);
         row.add(field, BorderLayout.CENTER);
         return row;
