@@ -284,6 +284,40 @@ public class Main {
             }
         });
 
+        dashboardWindow.setOnCreateGroupListener((groupName, invitedIds) -> {
+            // Ejecutamos la operación de red en un hilo de fondo (NetworkTask = SwingWorker)
+            new NetworkTask<Map<String,Object>>() {
+
+                @Override
+                protected Map<String,Object> doTask() throws Exception {
+                    // Crear el grupo en el servidor
+                    return client.createGroup(groupName, invitedIds);
+                }
+
+                @Override
+                protected void onSuccess(Map<String,Object> response) {
+                    // Si el servidor respondió OK, pedimos la lista actualizada de grupos
+                    if (Protocol.RES_OK.equals(String.valueOf(response.get("status")))) {
+                        // Do nothing: server will send us the updated group list.
+                    } else {
+                        // Caso error: mostramos el mensaje que vino del servidor
+                        JOptionPane.showMessageDialog(dashboardWindow,
+                                String.valueOf(response.getOrDefault("message",
+                                        "No se pudo crear el grupo")), "Crear grupo",
+                                JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+
+                @Override
+                protected void propagateError(Throwable ex) {
+                    // Cualquier excepción (timeout, desconexión, etc.)
+                    JOptionPane.showMessageDialog(dashboardWindow,
+                            "Error de comunicación: " + ex.getMessage(),
+                            "Crear grupo", JOptionPane.ERROR_MESSAGE);
+                }
+            }.execute();
+        });
+
         dashboardWindow.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 
         // Registrar listener global para mensajes entrantes

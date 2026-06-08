@@ -502,6 +502,9 @@ public class ClientHandler implements Runnable {
             response.put("status", Protocol.RES_OK);
             response.put("groupId", groupId);
             sendMessage(response);
+
+            sendGroupListToUser(currentUser.getId());
+
             // Notificar inmediatamente a los usuarios agregados si están conectados
             for (int userId : invitedUserIds) {
                 sendGroupListToUser(userId);
