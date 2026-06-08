@@ -132,6 +132,9 @@ public class ClientHandler implements Runnable {
                     case Protocol.CMD_SEND_TEMP_MSG:
                         handleSendTempMsg(data);
                         break;
+                    case Protocol.CMD_MARK_MSG_READ:
+                        handleMarkMsgRead(data);
+                        break;
                     case Protocol.CMD_CREATE_GROUP:
                         handleCreateGroup(data);
                         break;
@@ -484,30 +487,76 @@ public class ClientHandler implements Runnable {
         sendFriendInviteUpdateToUser(requesterId);
     }
 
-    private void handleSendTempMsg(Map<String, Object> data) throws IOException {
+    private void handleSendTempMsg(Map<String, Object> data) throws IOException, SQLException {
         String content = (String) data.get("content");
+        Integer targetId = (Integer) data.get("targetUserId");   // nuevo campo
         if (content == null || content.trim().isEmpty()) {
             sendError("El mensaje general no puede estar vacío");
             return;
         }
 
+        // Si el remitente envía a sí mismo, ignoramos (no tiene sentido)
+        if (targetId != null && targetId == currentUser.getId()) {
+            sendError("No puedes enviarte un mensaje a ti mismo");
+            return;
+        }
+
+        // Guardamos el mensaje **siempre** como "pending"
+        MessageManager mm = new MessageManager();
+        if (targetId != null) {
+            mm.saveTemporaryMessage(currentUser.getId(), targetId, content);
+        }
+
+        // Construir el mensaje que se enviará a los clientes conectados (solo a los online)
         Map<String, Object> newMsg = new HashMap<>();
         newMsg.put("status", Protocol.RES_NEW_MESSAGE);
         newMsg.put("senderId", currentUser.getId());
         newMsg.put("senderUsername", currentUser.getUsername());
         newMsg.put("content", content);
-        newMsg.put("type", "general");
+        newMsg.put("type", "temporary");   // nuevo tipo “temporary”
 
-        synchronized (connectedClients) {
-            for (ClientHandler handler : connectedClients.values()) {
-                if (handler != this) {
-                    handler.sendMessage(newMsg);
+        // Si el destinatario está online enviamos en tiempo real, de lo contrario no.
+        if (targetId != null) {
+            ClientHandler targetHandler = connectedClients.get(getUsernameById(targetId));
+            if (targetHandler != null) {                      // está conectado
+                newMsg.put("targetUserId", targetId);
+                targetHandler.sendMessage(newMsg);
+                // También podemos marcar el mensaje como “delivered” en BD, pero no es obligatorio para la UI.
+            } else {
+                // Destinatario offline → devolvemos al remitente que el mensaje quedó pendiente
+                Map<String, Object> resp = new HashMap<>();
+                resp.put("status", "PENDING");                 // <‑‑ nuevo status que el cliente debe interpretar
+                resp.put("message", "Mensaje almacenado como pendiente");
+                sendMessage(resp);
+                return;
+            }
+        } else {
+            // Broadcast a todos (sin destinatario concreto)
+            synchronized (connectedClients) {
+                for (ClientHandler handler : connectedClients.values()) {
+                    if (handler != this) {
+                        handler.sendMessage(newMsg);
+                    }
                 }
             }
         }
+
+        // Si llegamos aquí, el mensaje se entregó en tiempo real → respondemos OK
         sendOk();
     }
-    
+
+    private void handleMarkMsgRead(Map<String, Object> data) throws SQLException, IOException {
+        Integer msgId = (data != null && data.get("messageId") instanceof Number n) ? n.intValue() : null;
+        if (msgId == null) {
+            sendError("messageId ausente o no numérico");
+            return;
+        }
+
+        MessageManager mm = new MessageManager();
+        // Cambiamos el estado a "sent"
+        mm.markMessageRead(msgId);      // método que crearemos a continuación
+        sendOk();                       // responde { "status":"OK" }
+    }    
 
     private void handleSendGroupMsg(Map<String, Object> data) throws SQLException, IOException {
         if (data == null || data.get("groupId") == null) {

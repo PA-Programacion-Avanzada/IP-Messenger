@@ -35,6 +35,8 @@ public final class Protocol {
     public static final String RES_USER_LIST = "USER_LIST";
     public static final String RES_PENDING_MESSAGES = "PENDING_MESSAGES";
     public static final String RES_NEW_MESSAGE = "NEW_MESSAGE";
+    public static final String CMD_GET_PENDING_MSGS   = "GET_PENDING_MSGS";   // pide la lista de pendientes
+    public static final String CMD_MARK_MSG_READ     = "MARK_MSG_READ";     // marca un mensaje como leído / entregado
 
     private Protocol() { }
 }

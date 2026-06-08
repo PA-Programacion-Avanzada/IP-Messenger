@@ -232,6 +232,27 @@ public class Main {
         recoverModal.setVisible(true);
     }
 
+    private void refreshPendingBadge() {
+        new NetworkTask<Integer>() {
+            @Override
+            protected Integer doTask() throws Exception {
+                Map<String, Object> resp = client.getPendingMessages();   // método cliente que añadiremos
+                List<?> msgs = (List<?>) resp.getOrDefault("messages", List.of());
+                return msgs.size();
+            }
+
+            @Override
+            protected void onSuccess(Integer count) {
+                dashboardWindow.setPendingFriendChatCount(count);
+            }
+
+            @Override
+            protected void propagateError(Throwable ex) {
+                // Si falla, simplemente dejamos el badge como estaba
+            }
+        }.execute();
+    }
+
     private void showDashboardWindow(String serverIp) {
         dashboardWindow = new DashboardWindow();
         dashboardWindow.setTitle("IP Messenger - " + session.getUsername() + " (" + serverIp + ")");
@@ -276,14 +297,85 @@ public class Main {
 
         dashboardWindow.setOnSendTemporaryMessageListener((message, targetUser) -> {
             try {
-                Map<String, Object> response = client.sendGeneralMessage(message);
-                if (!Protocol.RES_OK.equals(String.valueOf(response.get("status")))) {
+                Map<String, Object> response;
+                if (targetUser != null) {
+                    response = client.sendTemporaryMessage(targetUser.getUserId(), message);
+                } else {
+                    response = client.sendGeneralMessage(message);
+                }
+
+                String status = String.valueOf(response.get("status"));
+                if (Protocol.RES_OK.equals(status)) {
+                } else if ("PENDING".equalsIgnoreCase(status)) {
                     JOptionPane.showMessageDialog(dashboardWindow,
-                            response.getOrDefault("message", "No se pudo enviar el mensaje general"));
+                            "El usuario está offline; el mensaje se guardó como pendiente.",
+                            "Mensaje pendiente", JOptionPane.INFORMATION_MESSAGE);
+                    refreshPendingBadge();
+                } else {
+                    JOptionPane.showMessageDialog(dashboardWindow,
+                            response.getOrDefault("message", "No se pudo enviar el mensaje"),
+                            "Error", JOptionPane.ERROR_MESSAGE);
                 }
             } catch (IOException ex) {
-                JOptionPane.showMessageDialog(dashboardWindow, "Error de conexión: " + ex.getMessage());
+                JOptionPane.showMessageDialog(dashboardWindow,
+                        "Error de conexión: " + ex.getMessage(),
+                        "Error", JOptionPane.ERROR_MESSAGE);
             }
+        });
+
+        dashboardWindow.setOnPendingMessagesSelectedListener(() -> {
+            new NetworkTask<List<PendingMessagesModal.PendingMessage>>() {
+                @Override
+                protected List<PendingMessagesModal.PendingMessage> doTask() throws Exception {
+                    // El endpoint para obtener los pendientes ya está cubierto por
+                    Map<String, Object> resp = client.getPendingMessages();
+                    List<?> raw = (List<?>) resp.get("messages");
+                    List<PendingMessagesModal.PendingMessage> out = new ArrayList<>();
+                    for (Object o : raw) {
+                        if (o instanceof Map<?, ?> rawMap) {
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> m = (Map<String, Object>) rawMap;
+
+                            int    id      = ((Number) m.getOrDefault("id", -1)).intValue();
+                            String sender  = String.valueOf(m.getOrDefault("senderUsername", "Desconocido"));
+                            String content = String.valueOf(m.getOrDefault("content", ""));
+                            String ts      = String.valueOf(m.getOrDefault("timestamp", ""));
+
+                            out.add(new PendingMessagesModal.PendingMessage(sender, content, ts, id));
+                        }
+                    }
+                    return out;
+                }
+
+                @Override
+                protected void onSuccess(List<PendingMessagesModal.PendingMessage> pending) {
+                    PendingMessagesModal modal = new PendingMessagesModal(dashboardWindow);
+                    modal.setPendingMessages(pending);
+
+                    modal.setOnMarkAsReadListener(selected -> {
+                        for (PendingMessagesModal.PendingMessage pm : selected) {
+                            try {
+                                client.markMessageRead(pm.getMessageId());
+                            } catch (IOException ex) {
+                                JOptionPane.showMessageDialog(modal,
+                                        "Error marcando como leído: " + ex.getMessage(),
+                                        "Error", JOptionPane.ERROR_MESSAGE);
+                            }
+                        }
+                        refreshPendingBadge();
+                    });
+
+                    modal.setOnCloseListener(() -> refreshPendingBadge());
+                    modal.setVisible(true);
+                }
+
+                @Override
+                protected void propagateError(Throwable ex) {
+                    JOptionPane.showMessageDialog(dashboardWindow,
+                            "Error cargando mensajes pendientes: " + ex.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }.execute();
         });
 
         dashboardWindow.setOnCreateGroupListener((groupName, invitedIds) -> {

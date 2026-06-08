@@ -103,7 +103,7 @@ public class MessageDAO {
                 m.setContent(rs.getString("content"));
                 m.setTimestamp(rs.getTimestamp("timestamp"));
                 msgs.add(m);
-}
+            }
         }
         return msgs;
     }
