@@ -472,19 +472,17 @@ public class Main {
 
     
     if ("group".equals(type)) {
-        int groupId = ((Number) message.getOrDefault("groupId", -1)).intValue();
+    int groupId = ((Number) message.getOrDefault("groupId", -1)).intValue();
 
-       
-        if (senderName.equals(session.getUsername()) || senderId == session.getUserId()) {
-            return; 
-        }
+    // 1. Calcula quién envió realmente el mensaje comparando IDs (más seguro que nombres)
+    boolean esMio = (senderId == session.getUserId());
 
-      
-        ui.PanelGrupos panel = openGroupPanels.get(groupId);
-        if (panel != null) {
-            panel.addMessage(content, senderName, false); 
-            return;
-        } else {
+    ui.PanelGrupos panel = openGroupPanels.get(groupId);
+    if (panel != null) {
+        
+        panel.addMessage(content, senderName, esMio);
+        return;
+    } else {
             
             JOptionPane.showMessageDialog(dashboardWindow,
                     senderName + " (grupo): " + content,
