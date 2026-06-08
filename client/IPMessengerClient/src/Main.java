@@ -25,6 +25,7 @@ public class Main {
     private final Map<Integer, String> userNamesById = new HashMap<>();
     private final Map<Integer, DashboardWindow.FriendConversation> conversationsByUserId = new HashMap<>();
     private final Map<Integer, ui.PanelGrupos> openGroupPanels = new HashMap<>();
+    private final Map<Integer, javax.swing.JDialog> openGroupDialogs = new HashMap<>();
 
 
     public static void main(String[] args) {
@@ -325,6 +326,15 @@ public class Main {
 
         dashboardWindow.setOnGroupSelectedListener(group -> {
             try {
+                javax.swing.JDialog existingDialog = openGroupDialogs.get(group.getGroupId());
+                if (existingDialog != null && existingDialog.isDisplayable()) {
+                    existingDialog.toFront();
+                    existingDialog.requestFocus();
+                    return;
+                }
+                openGroupPanels.remove(group.getGroupId());
+                openGroupDialogs.remove(group.getGroupId());
+
                 ui.PanelGrupos miPanelDeGrupos = new ui.PanelGrupos();
                 miPanelDeGrupos.setGroupInfo(group.getName(), group.getMemberCount());
                 if (group.getMemberNames() != null && !group.getMemberNames().isEmpty()) {
@@ -350,33 +360,34 @@ public class Main {
 
                 openGroupPanels.put(group.getGroupId(), miPanelDeGrupos);
 
-                new Thread(() -> {
-                    try {
-                        java.util.Map<String, Object> dataParams = new java.util.HashMap<>();
-                        dataParams.put("groupId", group.getGroupId());
+                new NetworkTask<java.util.Map<String, Object>>() {
+                    @Override
+                    protected java.util.Map<String, Object> doTask() throws Exception {
+                        return client.getGroupHistory(group.getGroupId(), 100);
+                    }
 
-                        java.util.Map<String, Object> response = client.sendCommand("GET_GROUP_HISTORY", dataParams);
-
-                        if (response != null && response.containsKey("messages")) {
-                            java.util.List<?> mensajes = (java.util.List<?>) response.get("messages");
-
-                            javax.swing.SwingUtilities.invokeLater(() -> {
-                                for (Object obj : mensajes) {
-                                    if (obj instanceof java.util.Map<?, ?> msg) {
-                                        String txt = String.valueOf(msg.get("content"));
-                                        String rem = String.valueOf(msg.get("senderUsername"));
-                                        String hora = msg.containsKey("timestamp") ? String.valueOf(msg.get("timestamp")) : "";
-
-                                        boolean esMio = rem.equals(session.getUsername());
-                                        miPanelDeGrupos.addHistoryMessage(txt, rem, esMio, hora);
-                                    }
-                                }
-                            });
+                    @Override
+                    protected void onSuccess(java.util.Map<String, Object> response) {
+                        if (response == null || !response.containsKey("messages")) {
+                            return;
                         }
-                    } catch (Exception ex) {
+                        java.util.List<?> mensajes = (java.util.List<?>) response.get("messages");
+                        for (Object obj : mensajes) {
+                            if (obj instanceof java.util.Map<?, ?> msg) {
+                                String txt = String.valueOf(msg.get("content"));
+                                String rem = String.valueOf(msg.get("senderUsername"));
+                                String hora = msg.containsKey("timestamp") ? String.valueOf(msg.get("timestamp")) : "";
+                                boolean esMio = isOwnGroupHistoryMessage(msg);
+                                miPanelDeGrupos.addHistoryMessage(txt, rem, esMio, hora);
+                            }
+                        }
+                    }
+
+                    @Override
+                    protected void propagateError(Throwable ex) {
                         System.out.println("[HISTORIAL ERROR] Error cargando mensajes antiguos: " + ex.getMessage());
                     }
-                }, "hilo-historial-grupo").start();
+                }.execute();
 
                 javax.swing.JDialog ventanaFlotante = new javax.swing.JDialog(dashboardWindow, group.getName(), false);
                 ventanaFlotante.setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
@@ -386,10 +397,12 @@ public class Main {
                 ventanaFlotante.setMinimumSize(new java.awt.Dimension(760, 560));
                 ventanaFlotante.setLocationRelativeTo(dashboardWindow);
 
+                openGroupDialogs.put(group.getGroupId(), ventanaFlotante);
                 ventanaFlotante.addWindowListener(new java.awt.event.WindowAdapter() {
                     @Override
                     public void windowClosed(java.awt.event.WindowEvent e) {
                         openGroupPanels.remove(group.getGroupId());
+                        openGroupDialogs.remove(group.getGroupId());
                     }
                 });
 
@@ -399,36 +412,6 @@ public class Main {
                 javax.swing.JOptionPane.showMessageDialog(dashboardWindow, "No se pudo abrir la ventana de grupo: " + ex.getMessage());
             }
         }); // <-- cierra setOnGroupSelectedListener
-
-        dashboardWindow.setOnCreateGroupListener((groupName, memberIds) -> {
-            if (groupName == null || groupName.trim().isEmpty()) {
-                JOptionPane.showMessageDialog(dashboardWindow, "El nombre del grupo es obligatorio.");
-                return;
-            }
-
-            new Thread(() -> {
-                try {
-                    java.util.Map<String, Object> params = new java.util.HashMap<>();
-                    params.put("name", groupName);
-                    params.put("members", memberIds);
-
-                    java.util.Map<String, Object> response = client.sendCommand("CREATE_GROUP", params);
-
-                    javax.swing.SwingUtilities.invokeLater(() -> {
-                        if (response != null && "OK".equals(String.valueOf(response.get("status")))) {
-                            JOptionPane.showMessageDialog(dashboardWindow, "Grupo '" + groupName + "' creado exitosamente.");
-                        } else {
-                            String msg = (response != null) ? String.valueOf(response.getOrDefault("message", "Error desconocido")) : "Sin respuesta del servidor";
-                            JOptionPane.showMessageDialog(dashboardWindow, "No se pudo crear el grupo: " + msg);
-                        }
-                    });
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                    javax.swing.SwingUtilities.invokeLater(() ->
-                        JOptionPane.showMessageDialog(dashboardWindow, "Error de red: " + ex.getMessage()));
-                }
-            }).start();
-        }); // <-- cierra setOnCreateGroupListener
 
         dashboardWindow.setVisible(true);
     } // <-- cierra showDashboardWindow
@@ -572,7 +555,7 @@ public class Main {
                             String rem = String.valueOf(msg.get("senderUsername"));
                             String hora = msg.containsKey("timestamp") ? String.valueOf(msg.get("timestamp")) : "";
 
-                            boolean esMio = rem.equals(session.getUsername());
+                            boolean esMio = isOwnGroupHistoryMessage(msg);
                             panel.addHistoryMessage(txt, rem, esMio, hora);
                         }
                     }
@@ -693,6 +676,14 @@ public class Main {
             friendInvites.add(new DashboardWindow.FriendInvitation(requesterName, requesterId, incoming));
         }
         dashboardWindow.setFriendInvitations(friendInvites);
+    }
+
+    private boolean isOwnGroupHistoryMessage(Map<?, ?> msg) {
+        if (msg.containsKey("senderId") && msg.get("senderId") instanceof Number senderId) {
+            return senderId.intValue() == session.getUserId();
+        }
+        String rem = String.valueOf(msg.get("senderUsername"));
+        return rem.equals(session.getUsername());
     }
 
     private void closeClientQuietly(Client activeClient) {

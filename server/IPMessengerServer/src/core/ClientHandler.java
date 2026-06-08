@@ -1,5 +1,6 @@
 package core;
 
+import database.GroupMemberDAO;
 import database.UserDAO;
 import logic.*;
 import models.User;
@@ -117,7 +118,7 @@ public class ClientHandler implements Runnable {
                     case Protocol.CMD_ACCEPT_GROUP_INVITE:
                         handleAcceptGroupInvite(data);
                         break;
-                    case "GET_GROUP_HISTORY":
+                    case Protocol.CMD_GET_GROUP_HISTORY:
                         handleGetGroupHistory(data);
                         break;
                     case "GET_FRIEND_HISTORY":
@@ -489,8 +490,21 @@ public class ClientHandler implements Runnable {
     
 
     private void handleSendGroupMsg(Map<String, Object> data) throws SQLException, IOException {
+        if (data == null || data.get("groupId") == null) {
+            sendError("groupId requerido");
+            return;
+        }
         int groupId = ((Number) data.get("groupId")).intValue();
-        String content = (String) data.get("content");
+        String content = data.get("content") != null ? String.valueOf(data.get("content")).trim() : "";
+        if (content.isEmpty()) {
+            sendError("El mensaje no puede estar vacío");
+            return;
+        }
+        GroupMemberDAO memberDAO = new GroupMemberDAO();
+        if (!memberDAO.isAcceptedMember(groupId, currentUser.getId())) {
+            sendError("No eres miembro de este grupo");
+            return;
+        }
         MessageManager mm = new MessageManager();
         mm.sendGroupMessage(currentUser.getId(), groupId, content);
         // Reenviar a todos los miembros del grupo que estén conectados
@@ -616,27 +630,42 @@ public class ClientHandler implements Runnable {
     }
     
     private void handleGetGroupHistory(Map<String, Object> data) throws SQLException, IOException {
-    int groupId = ((Number) data.get("groupId")).intValue();
-    
-    // Llamamos al MessageManager para recuperar los mensajes de la BD
-    MessageManager mm = new MessageManager();
-    List<models.Message> mensajes = mm.getGroupMessages(groupId); // Asegúrate de tener este método en MessageManager
-    
-    List<Map<String, Object>> listaMensajes = new java.util.ArrayList<>();
-    for (models.Message m : mensajes) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("content", m.getContent());
-        map.put("senderUsername", getUsernameById(m.getSenderId()));
-        map.put("timestamp", m.getTimestamp().toString());
-        listaMensajes.add(map);
+        if (data == null || data.get("groupId") == null) {
+            sendError("groupId requerido");
+            return;
+        }
+        int groupId = ((Number) data.get("groupId")).intValue();
+        int limit = 100;
+        if (data.get("limit") instanceof Number limitNumber) {
+            limit = Math.max(1, Math.min(500, limitNumber.intValue()));
+        }
+
+        GroupMemberDAO memberDAO = new GroupMemberDAO();
+        if (!memberDAO.isAcceptedMember(groupId, currentUser.getId())) {
+            sendError("No eres miembro de este grupo");
+            return;
+        }
+
+        MessageManager mm = new MessageManager();
+        List<models.Message> mensajes = mm.getGroupMessages(groupId, limit);
+
+        List<Map<String, Object>> listaMensajes = new java.util.ArrayList<>();
+        for (models.Message m : mensajes) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("content", m.getContent());
+            map.put("senderId", m.getSenderId());
+            String senderUsername = getUsernameById(m.getSenderId());
+            map.put("senderUsername", senderUsername != null ? senderUsername : "Usuario");
+            map.put("timestamp", m.getTimestamp() != null ? m.getTimestamp().toString() : "");
+            listaMensajes.add(map);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", Protocol.RES_GROUP_HISTORY);
+        response.put("groupId", groupId);
+        response.put("messages", listaMensajes);
+
+        sendMessage(response);
+        Logger.log("[SERVER] Historial enviado para grupo " + groupId + " con " + listaMensajes.size() + " mensajes.");
     }
-    
-    Map<String, Object> response = new HashMap<>();
-    response.put("status", "RES_GROUP_HISTORY"); // Este status es el que espera tu Main.java
-    response.put("groupId", groupId);
-    response.put("messages", listaMensajes);
-    
-    sendMessage(response);
-    Logger.log("[SERVER] Historial enviado para grupo " + groupId + " con " + listaMensajes.size() + " mensajes.");
-}
 }
