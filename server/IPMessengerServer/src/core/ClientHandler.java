@@ -117,6 +117,10 @@ public class ClientHandler implements Runnable {
                     case Protocol.CMD_ACCEPT_GROUP_INVITE:
                         handleAcceptGroupInvite(data);
                         break;
+                    case "GET_GROUP_HISTORY":
+                        handleGetGroupHistory(data);
+                        break;
+            
                     // ... otros comandos
                     default:
                         sendError("Comando desconocido");
@@ -456,6 +460,7 @@ public class ClientHandler implements Runnable {
         }
         sendOk();
     }
+    
 
     private void handleSendGroupMsg(Map<String, Object> data) throws SQLException, IOException {
         int groupId = ((Number) data.get("groupId")).intValue();
@@ -580,4 +585,29 @@ public class ClientHandler implements Runnable {
             e.printStackTrace();
         }
     }
+    
+    private void handleGetGroupHistory(Map<String, Object> data) throws SQLException, IOException {
+    int groupId = ((Number) data.get("groupId")).intValue();
+    
+    // Llamamos al MessageManager para recuperar los mensajes de la BD
+    MessageManager mm = new MessageManager();
+    List<models.Message> mensajes = mm.getGroupMessages(groupId); // Asegúrate de tener este método en MessageManager
+    
+    List<Map<String, Object>> listaMensajes = new java.util.ArrayList<>();
+    for (models.Message m : mensajes) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("content", m.getContent());
+        map.put("senderUsername", getUsernameById(m.getSenderId()));
+        map.put("timestamp", m.getTimestamp().toString());
+        listaMensajes.add(map);
+    }
+    
+    Map<String, Object> response = new HashMap<>();
+    response.put("status", "RES_GROUP_HISTORY"); // Este status es el que espera tu Main.java
+    response.put("groupId", groupId);
+    response.put("messages", listaMensajes);
+    
+    sendMessage(response);
+    Logger.log("[SERVER] Historial enviado para grupo " + groupId + " con " + listaMensajes.size() + " mensajes.");
+}
 }

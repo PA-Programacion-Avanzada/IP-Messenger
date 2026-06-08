@@ -280,78 +280,90 @@ public class Main {
         // Registrar listener global para mensajes entrantes (actualiza UI y entrega a paneles abiertos)
         client.setMessageListener(message -> handleServerMessage(client, message));
         dashboardWindow.setOnGroupSelectedListener(group -> {
-            // Abrir PanelGrupos en un diálogo flotante
             try {
-                PanelGrupos miPanelDeGrupos = new PanelGrupos();
+                // 1. Instanciamos el panel visual de los grupos
+                ui.PanelGrupos miPanelDeGrupos = new ui.PanelGrupos();
                 miPanelDeGrupos.setGroupInfo(group.getName(), group.getMemberCount());
                 if (group.getMemberNames() != null && !group.getMemberNames().isEmpty()) {
                     miPanelDeGrupos.setGroupMembers(group.getMemberNames());
                 }
-                miPanelDeGrupos.setPreferredSize(new Dimension(900, 640));
+                miPanelDeGrupos.setPreferredSize(new java.awt.Dimension(900, 640));
 
-                // Registrar envío de mensajes desde el panel hacia el servidor
-                miPanelDeGrupos.setOnSendGroupMessageListener(msg -> {
-                    try {
-                        client.sendGroupMessage(group.getGroupId(), msg);
-                    } catch (IOException ex) {
-                        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(dashboardWindow, "Error enviando mensaje de grupo: " + ex.getMessage()));
+                // 2. Conectamos el listener con la firma exacta de tu PanelGrupos.java
+                miPanelDeGrupos.setOnSendGroupMessageListener(new ui.PanelGrupos.OnSendGroupMessageListener() {
+                    @Override
+                    public void onSendGroupMessage(String msg) {
+                        // Filtro rústico de seguridad: si el texto viene vacío, no hace nada
+                        if (msg == null || msg.trim().isEmpty()) {
+                            return;
+                        }
+                        try {
+                            // Enviamos el mensaje real al servidor a través del cliente
+                            client.sendGroupMessage(group.getGroupId(), msg);
+                        } catch (java.io.IOException ex) {
+                            javax.swing.SwingUtilities.invokeLater(() -> 
+                                javax.swing.JOptionPane.showMessageDialog(dashboardWindow, 
+                                    "Error enviando mensaje de grupo: " + ex.getMessage()));
+                        }
                     }
                 });
 
-                // Guardar panel abierto para recibir mensajes en tiempo real
+                // 3. Guardamos el panel en el mapa para actualizarlo en tiempo real al recibir mensajes
                 openGroupPanels.put(group.getGroupId(), miPanelDeGrupos);
 
-                JDialog ventanaFlotante = new JDialog(dashboardWindow, group.getName(), false);
-                ventanaFlotante.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+                // 4. SOLICITUD DE HISTORIAL REAL (Usando el método 'sendMessage' que pusimos público)
+                new Thread(() -> {
+                    try {
+                        java.util.Map<String, Object> dataParams = new java.util.HashMap<>();
+                        dataParams.put("groupId", group.getGroupId());
+                        
+                        // 'sendCommand' envía el comando y se queda esperando la lista de mensajes (Map)
+                        java.util.Map<String, Object> response = client.sendCommand("GET_GROUP_HISTORY", dataParams);
+                        
+                        if (response != null && response.containsKey("messages")) {
+                            java.util.List<?> mensajes = (java.util.List<?>) response.get("messages");
+                            
+                            // Pintamos los mensajes antiguos de golpe en la UI usando SwingUtilities
+                            javax.swing.SwingUtilities.invokeLater(() -> {
+                                for (Object obj : mensajes) {
+                                    if (obj instanceof java.util.Map<?, ?> msg) {
+                                        String txt = String.valueOf(msg.get("content"));
+                                        String rem = String.valueOf(msg.get("senderUsername"));
+                                        String hora = msg.containsKey("timestamp") ? String.valueOf(msg.get("timestamp")) : "";
+                                        
+                                        boolean esMio = rem.equals(session.getUsername());
+                                        miPanelDeGrupos.addHistoryMessage(txt, rem, esMio, hora);
+                                    }
+                                }
+                            });
+                        }
+                    } catch (Exception ex) {
+                        System.out.println("[HISTORIAL ERROR] Error cargando mensajes antiguos: " + ex.getMessage());
+                    }
+                }, "hilo-historial-grupo").start();
+                // ====================================================================
+
+                // 5. Crear y desplegar la ventana flotante (JDialog)
+                javax.swing.JDialog ventanaFlotante = new javax.swing.JDialog(dashboardWindow, group.getName(), false);
+                ventanaFlotante.setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
                 ventanaFlotante.getContentPane().add(miPanelDeGrupos);
                 ventanaFlotante.pack();
                 ventanaFlotante.setSize(920, 660);
-                ventanaFlotante.setMinimumSize(new Dimension(760, 560));
+                ventanaFlotante.setMinimumSize(new java.awt.Dimension(760, 560));
                 ventanaFlotante.setLocationRelativeTo(dashboardWindow);
+
+                // Limpiar el mapa cuando el usuario cierre la ventana flotante
                 ventanaFlotante.addWindowListener(new java.awt.event.WindowAdapter() {
                     @Override
                     public void windowClosed(java.awt.event.WindowEvent e) {
                         openGroupPanels.remove(group.getGroupId());
                     }
-                    @Override
-                    public void windowClosing(java.awt.event.WindowEvent e) {
-                        openGroupPanels.remove(group.getGroupId());
-                    }
                 });
+                
                 ventanaFlotante.setVisible(true);
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(dashboardWindow, "No se pudo abrir la ventana de grupo: " + ex.getMessage());
-            }
-        });
 
-        dashboardWindow.setOnCreateGroupListener((groupName, invitedUserIds) -> {
-            try {
-                Map<String, Object> resp = client.createGroup(groupName, invitedUserIds);
-                if (Protocol.RES_OK.equals(String.valueOf(resp.get("status")))) {
-                    int gid = -1;
-                    Object g = resp.get("groupId");
-                    if (g instanceof Number) gid = ((Number) g).intValue();
-                    List<String> memberNames = new ArrayList<>();
-                    memberNames.add(session.getUsername());
-                    for (Map<String, Object> friend : session.getFriends()) {
-                        int friendId = ((Number) friend.get("id")).intValue();
-                        if (invitedUserIds.contains(friendId)) {
-                            memberNames.add(String.valueOf(friend.get("username")));
-                        }
-                    }
-                    DashboardWindow.GroupItem created = new DashboardWindow.GroupItem(groupName, invitedUserIds.size() + 1, false, gid, memberNames);
-                    dashboardWindow.addGroup(created);
-                } else {
-                    JOptionPane.showMessageDialog(dashboardWindow, String.valueOf(resp.getOrDefault("message", "No se pudo crear el grupo")));
-                }
-            } catch (IOException ex) {
-                JOptionPane.showMessageDialog(dashboardWindow, "Error al crear grupo: " + ex.getMessage());
-            }
-        });
-        dashboardWindow.addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override
-            public void windowClosing(java.awt.event.WindowEvent e) {
-                closeClientQuietly(client);
+            } catch (Exception ex) {
+                javax.swing.JOptionPane.showMessageDialog(dashboardWindow, "No se pudo abrir la ventana de grupo: " + ex.getMessage());
             }
         });
 
@@ -418,41 +430,88 @@ public class Main {
     }
 
     private void handleIncomingMessage(Map<String, Object> message) {
-        String type = String.valueOf(message.getOrDefault("type", "friend"));
-        String content = String.valueOf(message.get("content"));
-        int senderId = ((Number) message.get("senderId")).intValue();
-        String senderName = String.valueOf(message.getOrDefault("senderUsername", userNamesById.getOrDefault(senderId, "Usuario " + senderId)));
+    String status = String.valueOf(message.get("status"));
+    String type = String.valueOf(message.getOrDefault("type", "friend"));
+    String content = String.valueOf(message.get("content"));
+    
+    int senderId = -1;
+    if (message.containsKey("senderId") && message.get("senderId") != null) {
+        try {
+            senderId = ((Number) message.get("senderId")).intValue();
+        } catch (Exception ignored) {}
+    }
+    
+    
+    String senderName = String.valueOf(message.getOrDefault("senderUsername", 
+            userNamesById.getOrDefault(senderId, "Usuario " + senderId)));
 
-        if ("general".equals(type)) {
+    
+    if ("RES_GROUP_HISTORY".equals(status) || (message.containsKey("messages") && message.containsKey("groupId"))) {
+        int groupId = ((Number) message.get("groupId")).intValue();
+        java.util.List<?> mensajes = (java.util.List<?>) message.get("messages");
+        
+        ui.PanelGrupos panel = openGroupPanels.get(groupId);
+        if (panel != null && mensajes != null) {
+            System.out.println("Mensajes recibidos: " + mensajes.size());
+            SwingUtilities.invokeLater(() -> {
+                for (Object obj : mensajes) {
+                    if (obj instanceof Map<?, ?> msg) {
+                        String txt = String.valueOf(msg.get("content"));
+                        String rem = String.valueOf(msg.get("senderUsername"));
+                        String hora = msg.containsKey("timestamp") ? String.valueOf(msg.get("timestamp")) : "";
+                        
+                        // Si el remitente es tu mismo usuario, se alinea a la derecha
+                        boolean esMio = rem.equals(session.getUsername());
+                        panel.addHistoryMessage(txt, rem, esMio, hora);
+                    }
+                }
+            });
+        }
+        return; //
+    }
+
+    
+    if ("group".equals(type)) {
+        int groupId = ((Number) message.getOrDefault("groupId", -1)).intValue();
+
+       
+        if (senderName.equals(session.getUsername()) || senderId == session.getUserId()) {
+            return; 
+        }
+
+      
+        ui.PanelGrupos panel = openGroupPanels.get(groupId);
+        if (panel != null) {
+            panel.addMessage(content, senderName, false); 
+            return;
+        } else {
+            
             JOptionPane.showMessageDialog(dashboardWindow,
-                    senderName + " (chat general): " + content,
-                    "Mensaje general",
+                    senderName + " (grupo): " + content,
+                    "Nuevo mensaje en el grupo",
                     JOptionPane.INFORMATION_MESSAGE);
             return;
         }
+    }
 
-        if ("group".equals(type)) {
-            int groupId = ((Number) message.getOrDefault("groupId", -1)).intValue();
-            ui.PanelGrupos panel = openGroupPanels.get(groupId);
-            if (panel != null) {
-                panel.addMessage(content, senderName, senderId == session.getUserId());
-                return;
-            } else {
-                // Notificar con dialog por defecto y actualizar badge
-                JOptionPane.showMessageDialog(dashboardWindow,
-                        senderName + " (grupo): " + content,
-                        "Mensaje de grupo",
-                        JOptionPane.INFORMATION_MESSAGE);
-                return;
-            }
-        }
+    
+    if ("general".equals(type)) {
+        JOptionPane.showMessageDialog(dashboardWindow,
+                senderName + " (chat general): " + content,
+                "Mensaje general",
+                JOptionPane.INFORMATION_MESSAGE);
+        return;
+    }
 
+    // Mensaje privado normal con un amigo (solo si no eres tú mismo)
+    if (senderId != session.getUserId() && !senderName.equals(session.getUsername())) {
         updateConversation(senderId, senderName, content, true);
         JOptionPane.showMessageDialog(dashboardWindow,
                 senderName + ": " + content,
                 "Nuevo mensaje",
                 JOptionPane.INFORMATION_MESSAGE);
     }
+}
 
     private void updateConversation(int userId, String username, String lastMessage, boolean unread) {
         userNamesById.put(userId, username);

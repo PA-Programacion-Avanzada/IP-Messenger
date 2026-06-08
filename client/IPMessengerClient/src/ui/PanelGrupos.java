@@ -286,6 +286,60 @@ public class PanelGrupos extends JPanel {
         messagesContainer.revalidate();
         messagesScrollPane.getVerticalScrollBar().setValue(messagesScrollPane.getVerticalScrollBar().getMaximum());
     }
+    
+    public void addHistoryMessage(String text, String sender, boolean own, String timestamp) {
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setOpaque(false);
+
+        JPanel bubble = new JPanel();
+        bubble.setLayout(new BoxLayout(bubble, BoxLayout.Y_AXIS));
+        bubble.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(own ? new Color(19, 100, 231) : new Color(200, 200, 200)),
+                new EmptyBorder(10, 12, 10, 12)));
+        bubble.setBackground(own ? new Color(19, 100, 231) : new Color(245, 245, 245));
+        bubble.setMaximumSize(new Dimension(420, Integer.MAX_VALUE));
+
+        JLabel senderLabel = new JLabel(sender);
+        senderLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        senderLabel.setForeground(own ? Color.WHITE : new Color(55, 55, 55));
+
+        JLabel textLabel = new JLabel(formatText(text));
+        textLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        textLabel.setForeground(own ? Color.WHITE : Color.BLACK);
+        textLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        // >>> CAMBIO AQUÍ: Si el timestamp viene con fecha completa "2026-06-07 20:00:21", dejamos solo "20:00"
+        String horaMostrar = (timestamp != null && !timestamp.isEmpty()) ? timestamp : "Antiguo";
+        if (horaMostrar.contains(" ") && horaMostrar.length() >= 16) {
+            horaMostrar = horaMostrar.substring(11, 16);
+        }
+
+        JLabel timeLabel = new JLabel(horaMostrar); // Muestra la hora real de la base de datos
+        timeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        timeLabel.setForeground(own ? new Color(220, 230, 255) : new Color(120, 120, 120));
+        timeLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
+
+        bubble.add(senderLabel);
+        bubble.add(Box.createRigidArea(new Dimension(0, 6)));
+        bubble.add(textLabel);
+        bubble.add(Box.createRigidArea(new Dimension(0, 8)));
+        bubble.add(timeLabel);
+
+        if (own) {
+            wrapper.add(bubble, BorderLayout.EAST);
+        } else {
+            wrapper.add(bubble, BorderLayout.WEST);
+        }
+        wrapper.setBorder(new EmptyBorder(4, 4, 4, 4));
+        messagesContainer.add(wrapper);
+        messagesContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+        messagesContainer.revalidate();
+        
+        // Auto-scroll al final
+        SwingUtilities.invokeLater(() -> {
+            messagesScrollPane.getVerticalScrollBar().setValue(messagesScrollPane.getVerticalScrollBar().getMaximum());
+        });
+    }
 
     private String formatText(String text) {
         return "<html>" + text.replace("\n", "<br>") + "</html>";

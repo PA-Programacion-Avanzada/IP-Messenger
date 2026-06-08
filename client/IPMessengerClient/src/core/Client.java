@@ -233,7 +233,7 @@ public class Client {
         }
     }
 
-    private void sendMessage(Map<String, Object> message) throws IOException {
+    public void sendMessage(Map<String, Object> message) throws IOException {
         String json = JSONParser.toJson(message);
         byte[] payload = json.getBytes(StandardCharsets.UTF_8);
         byte[] compressed = LZ77Compressor.compress(payload);

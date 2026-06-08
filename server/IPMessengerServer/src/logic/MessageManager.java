@@ -40,4 +40,8 @@ public class MessageManager {
     public List<Message> getGroupMessages(int groupId, int limit) throws SQLException {
         return messageDAO.getGroupMessages(groupId, limit);
     }
+    public List<Message> getGroupMessages(int groupId) throws SQLException {
+    // Llamamos al método original usando un límite estándar (ej. 100 mensajes)
+    return messageDAO.getGroupMessages(groupId, 100);
+}
 }

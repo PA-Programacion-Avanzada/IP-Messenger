@@ -57,24 +57,23 @@ public class MessageDAO {
     }
 
     public List<Message> getGroupMessages(int groupId, int limit) throws SQLException {
-        List<Message> msgs = new ArrayList<>();
-        String sql = "SELECT * FROM Messages WHERE receiver_type = 'group' AND receiver_id = ? ORDER BY timestamp DESC LIMIT ?";
-        try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
-            stmt.setInt(1, groupId);
-            stmt.setInt(2, limit);
-            ResultSet rs = stmt.executeQuery();
-            while (rs.next()) {
-                Message m = new Message();
-                m.setId(rs.getInt("id"));
-                m.setSenderId(rs.getInt("sender_id"));
-                m.setReceiverType(rs.getString("receiver_type"));
-                m.setReceiverId(rs.getInt("receiver_id"));
-                m.setContent(rs.getString("content"));
-                m.setStatus(rs.getString("status"));
-                m.setTimestamp(rs.getTimestamp("timestamp"));
-                msgs.add(m);
-            }
+    List<Message> msgs = new ArrayList<>();
+    // Cambiamos DESC por ASC para que los mensajes antiguos aparezcan primero
+    String sql = "SELECT * FROM (SELECT * FROM Messages WHERE receiver_type = 'group' AND receiver_id = ? ORDER BY timestamp DESC LIMIT ?) ORDER BY timestamp ASC";
+    
+    try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
+        stmt.setInt(1, groupId);
+        stmt.setInt(2, limit);
+        ResultSet rs = stmt.executeQuery();
+        while (rs.next()) {
+            Message m = new Message();
+            m.setId(rs.getInt("id"));
+            m.setSenderId(rs.getInt("sender_id"));
+            m.setContent(rs.getString("content"));
+            m.setTimestamp(rs.getTimestamp("timestamp"));
+            msgs.add(m);
         }
-        return msgs;
     }
+    return msgs;
+}
 }
