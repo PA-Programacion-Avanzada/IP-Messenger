@@ -8,7 +8,9 @@ import models.Group;
 import models.User;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class GroupManager {
     private GroupDAO groupDAO = new GroupDAO();
@@ -89,5 +91,50 @@ public class GroupManager {
             if (u != null) members.add(u);
         }
         return members;
+    }
+
+    public int inviteMembersToGroup(int groupId, int inviterId, List<Integer> invitedUserIds) throws SQLException {
+        if (!memberDAO.isAcceptedMember(groupId, inviterId)) {
+            return 0;
+        }
+        if (groupDAO.findById(groupId) == null) {
+            return 0;
+        }
+
+        FriendshipDAO friendshipDAO = new FriendshipDAO();
+        int added = 0;
+        for (int uid : invitedUserIds) {
+            if (uid == inviterId) {
+                continue;
+            }
+            if (!friendshipDAO.areFriends(inviterId, uid)) {
+                continue;
+            }
+            String status = memberDAO.getMemberStatus(groupId, uid);
+            if ("accepted".equals(status) || "invited".equals(status)) {
+                continue;
+            }
+            memberDAO.reinviteMember(groupId, uid);
+            added++;
+        }
+        return added;
+    }
+
+    public List<Map<String, Object>> getPendingGroupInvites(int userId) throws SQLException {
+        List<Map<String, Object>> invites = new ArrayList<>();
+        for (int groupId : memberDAO.getInvitedGroupIds(userId)) {
+            Group group = groupDAO.findById(groupId);
+            if (group == null) {
+                continue;
+            }
+            User creator = userDAO.findById(group.getCreatorId());
+            Map<String, Object> invite = new HashMap<>();
+            invite.put("groupId", groupId);
+            invite.put("groupName", group.getName());
+            invite.put("inviterId", group.getCreatorId());
+            invite.put("inviterName", creator != null ? creator.getUsername() : "Usuario");
+            invites.add(invite);
+        }
+        return invites;
     }
 }

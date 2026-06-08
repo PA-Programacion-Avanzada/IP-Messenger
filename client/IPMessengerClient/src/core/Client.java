@@ -112,6 +112,7 @@ public class Client {
             pendingBootstrap.add(Protocol.RES_USER_LIST);
             pendingBootstrap.add(Protocol.RES_PENDING_MESSAGES);
             pendingBootstrap.add(Protocol.RES_FRIEND_INVITE_LIST);
+            pendingBootstrap.add(Protocol.RES_GROUP_INVITE_LIST);
 
             while (!pendingBootstrap.isEmpty()) {
                 Map<String, Object> bootstrapMessage = waitForResponse();
@@ -187,6 +188,25 @@ public class Client {
         return sendCommand(Protocol.CMD_GET_GROUP_HISTORY, data);
     }
 
+    public Map<String, Object> inviteToGroup(int groupId, java.util.List<Integer> invitedUserIds) throws IOException {
+        Map<String, Object> data = new HashMap<>();
+        data.put("groupId", groupId);
+        data.put("invitedUserIds", invitedUserIds);
+        return sendCommand(Protocol.CMD_INVITE_TO_GROUP, data);
+    }
+
+    public Map<String, Object> acceptGroupInvite(int groupId) throws IOException {
+        Map<String, Object> data = new HashMap<>();
+        data.put("groupId", groupId);
+        return sendCommand(Protocol.CMD_ACCEPT_GROUP_INVITE, data);
+    }
+
+    public Map<String, Object> rejectGroupInvite(int groupId) throws IOException {
+        Map<String, Object> data = new HashMap<>();
+        data.put("groupId", groupId);
+        return sendCommand(Protocol.CMD_REJECT_GROUP_INVITE, data);
+    }
+
     public Map<String, Object> sendCommand(String command, Map<String, Object> data) throws IOException {
         sendCommandPayload(command, data);
         return waitForResponse();
@@ -219,7 +239,8 @@ public class Client {
                             || Protocol.RES_USER_LIST.equals(status)
                             || Protocol.RES_FRIEND_LIST.equals(status)
                             || Protocol.RES_GROUP_LIST.equals(status)
-                            || Protocol.RES_FRIEND_INVITE_LIST.equals(status))) {
+                            || Protocol.RES_FRIEND_INVITE_LIST.equals(status)
+                            || Protocol.RES_GROUP_INVITE_LIST.equals(status))) {
                     MessageListener listener = messageListener;
                     if (listener != null) {
                         listener.onMessage(message);

@@ -13,6 +13,7 @@ public class SessionData {
     private final List<Map<String, Object>> users = new ArrayList<>();
     private final List<Map<String, Object>> pendingMessages = new ArrayList<>();
     private final List<Map<String, Object>> friendInvites = new ArrayList<>();
+    private final List<Map<String, Object>> groupInvites = new ArrayList<>();
 
     public int getUserId() {
         return userId;
@@ -48,6 +49,10 @@ public class SessionData {
 
     public List<Map<String, Object>> getFriendInvites() {
         return friendInvites;
+    }
+
+    public List<Map<String, Object>> getGroupInvites() {
+        return groupInvites;
     }
 
     public void absorb(Map<String, Object> message) {
@@ -107,6 +112,17 @@ public class SessionData {
                     for (Object item : list) {
                         if (item instanceof Map<?, ?> map) {
                             friendInvites.add((Map<String, Object>) map);
+                        }
+                    }
+                }
+            }
+            case Protocol.RES_GROUP_INVITE_LIST -> {
+                groupInvites.clear();
+                Object rawInvites = message.get("invites");
+                if (rawInvites instanceof List<?> list) {
+                    for (Object item : list) {
+                        if (item instanceof Map<?, ?> map) {
+                            groupInvites.add((Map<String, Object>) map);
                         }
                     }
                 }

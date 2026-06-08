@@ -115,8 +115,17 @@ public class ClientHandler implements Runnable {
                     case Protocol.CMD_CREATE_GROUP:
                         handleCreateGroup(data);
                         break;
+                    case Protocol.CMD_INVITE_TO_GROUP:
+                        handleInviteToGroup(data);
+                        break;
                     case Protocol.CMD_ACCEPT_GROUP_INVITE:
                         handleAcceptGroupInvite(data);
+                        break;
+                    case Protocol.CMD_REJECT_GROUP_INVITE:
+                        handleRejectGroupInvite(data);
+                        break;
+                    case Protocol.CMD_GET_GROUP_INVITES:
+                        sendGroupInviteList();
                         break;
                     case Protocol.CMD_GET_GROUP_HISTORY:
                         handleGetGroupHistory(data);
@@ -161,6 +170,7 @@ public class ClientHandler implements Runnable {
             sendAllUsers();
             sendPendingMessages();
             sendFriendInviteList();
+            sendGroupInviteList();
             scheduleUserListBroadcast();
         } else {
             loginAttempts++;
@@ -353,6 +363,29 @@ public class ClientHandler implements Runnable {
                 ClientHandler handler = connectedClients.get(target.getUsername());
                 if (handler != null) {
                     handler.sendGroupList();
+                }
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private void sendGroupInviteList() throws SQLException, IOException {
+        GroupManager gm = new GroupManager();
+        List<Map<String, Object>> invites = gm.getPendingGroupInvites(currentUser.getId());
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", Protocol.RES_GROUP_INVITE_LIST);
+        response.put("invites", invites);
+        sendMessage(response);
+    }
+
+    private void sendGroupInviteListToUser(int userId) {
+        synchronized (connectedClients) {
+            try {
+                User target = new UserDAO().findById(userId);
+                if (target == null) return;
+                ClientHandler handler = connectedClients.get(target.getUsername());
+                if (handler != null) {
+                    handler.sendGroupInviteList();
                 }
             } catch (Exception ignored) {
             }
@@ -572,11 +605,68 @@ public class ClientHandler implements Runnable {
         return result;
     }
 
-    private void handleAcceptGroupInvite(Map<String, Object> data) throws SQLException, IOException {
+    private void handleInviteToGroup(Map<String, Object> data) throws SQLException, IOException {
+        if (data == null || data.get("groupId") == null) {
+            sendError("groupId requerido");
+            return;
+        }
         int groupId = ((Number) data.get("groupId")).intValue();
+        List<Integer> invitedUserIds = convertToIntegerList(data.get("invitedUserIds"));
+        if (invitedUserIds.isEmpty()) {
+            sendError("Selecciona al menos un amigo para invitar");
+            return;
+        }
+
+        GroupManager gm = new GroupManager();
+        int added = gm.inviteMembersToGroup(groupId, currentUser.getId(), invitedUserIds);
+        if (added <= 0) {
+            sendError("No se pudo invitar. Verifica que sean tus amigos y que no estén ya en el grupo.");
+            return;
+        }
+
+        sendOk();
+        sendGroupList();
+        for (int userId : invitedUserIds) {
+            sendGroupInviteListToUser(userId);
+        }
+    }
+
+    private void handleAcceptGroupInvite(Map<String, Object> data) throws SQLException, IOException {
+        if (data == null || data.get("groupId") == null) {
+            sendError("groupId requerido");
+            return;
+        }
+        int groupId = ((Number) data.get("groupId")).intValue();
+        GroupMemberDAO memberDAO = new GroupMemberDAO();
+        if (!"invited".equals(memberDAO.getMemberStatus(groupId, currentUser.getId()))) {
+            sendError("No tienes una invitación pendiente para este grupo");
+            return;
+        }
+
         GroupManager gm = new GroupManager();
         gm.acceptInvitation(groupId, currentUser.getId());
         sendOk();
+        sendGroupList();
+        sendGroupInviteList();
+    }
+
+    private void handleRejectGroupInvite(Map<String, Object> data) throws SQLException, IOException {
+        if (data == null || data.get("groupId") == null) {
+            sendError("groupId requerido");
+            return;
+        }
+        int groupId = ((Number) data.get("groupId")).intValue();
+        GroupMemberDAO memberDAO = new GroupMemberDAO();
+        if (!"invited".equals(memberDAO.getMemberStatus(groupId, currentUser.getId()))) {
+            sendError("No tienes una invitación pendiente para este grupo");
+            return;
+        }
+
+        GroupManager gm = new GroupManager();
+        gm.rejectInvitation(groupId, currentUser.getId());
+        sendOk();
+        sendGroupInviteList();
+        sendGroupListToUser(currentUser.getId());
     }
 
     private synchronized void sendMessage(Map<String, Object> message) throws IOException {
@@ -635,9 +725,9 @@ public class ClientHandler implements Runnable {
             return;
         }
         int groupId = ((Number) data.get("groupId")).intValue();
-        int limit = 100;
+        int limit = 500;
         if (data.get("limit") instanceof Number limitNumber) {
-            limit = Math.max(1, Math.min(500, limitNumber.intValue()));
+            limit = Math.max(1, Math.min(1000, limitNumber.intValue()));
         }
 
         GroupMemberDAO memberDAO = new GroupMemberDAO();

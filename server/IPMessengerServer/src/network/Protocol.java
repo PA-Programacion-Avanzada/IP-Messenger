@@ -24,6 +24,7 @@ public class Protocol {
     public static final String CMD_MARK_MSG_READ = "MARK_MSG_READ";
     public static final String CMD_GET_FRIEND_HISTORY = "GET_FRIEND_HISTORY";
     public static final String CMD_GET_GROUP_HISTORY = "GET_GROUP_HISTORY";
+    public static final String CMD_GET_GROUP_INVITES = "GET_GROUP_INVITES";
 
     // Respuestas del servidor
     public static final String RES_OK = "OK";
@@ -40,4 +41,5 @@ public class Protocol {
     public static final String RES_NEW_MESSAGE = "NEW_MESSAGE";
     public static final String RES_FRIEND_HISTORY = "FRIEND_HISTORY";
     public static final String RES_GROUP_HISTORY = "RES_GROUP_HISTORY";
+    public static final String RES_GROUP_INVITE_LIST = "GROUP_INVITE_LIST";
 }

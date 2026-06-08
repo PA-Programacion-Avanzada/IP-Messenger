@@ -285,6 +285,86 @@ public class Main {
             }
         });
 
+        dashboardWindow.setOnInvitationActionListener(new DashboardWindow.OnInvitationActionListener() {
+            @Override
+            public void onAccept(DashboardWindow.GroupInvitation invitation) {
+                new NetworkTask<Map<String, Object>>() {
+                    @Override
+                    protected Map<String, Object> doTask() throws Exception {
+                        return client.acceptGroupInvite(invitation.getGroupId());
+                    }
+
+                    @Override
+                    protected void onSuccess(Map<String, Object> response) {
+                        if (Protocol.RES_OK.equals(String.valueOf(response.get("status")))) {
+                            JOptionPane.showMessageDialog(dashboardWindow,
+                                    "Te uniste al grupo \"" + invitation.getGroupName() + "\". "
+                                            + "Abre el grupo para ver todo el historial.",
+                                    "Grupo", JOptionPane.INFORMATION_MESSAGE);
+                        } else {
+                            JOptionPane.showMessageDialog(dashboardWindow,
+                                    String.valueOf(response.getOrDefault("message", "No se pudo aceptar la invitación")));
+                        }
+                    }
+
+                    @Override
+                    protected void propagateError(Throwable ex) {
+                        JOptionPane.showMessageDialog(dashboardWindow, "Error de conexión: " + ex.getMessage());
+                    }
+                }.execute();
+            }
+
+            @Override
+            public void onReject(DashboardWindow.GroupInvitation invitation) {
+                new NetworkTask<Map<String, Object>>() {
+                    @Override
+                    protected Map<String, Object> doTask() throws Exception {
+                        return client.rejectGroupInvite(invitation.getGroupId());
+                    }
+
+                    @Override
+                    protected void onSuccess(Map<String, Object> response) {
+                        if (!Protocol.RES_OK.equals(String.valueOf(response.get("status")))) {
+                            JOptionPane.showMessageDialog(dashboardWindow,
+                                    String.valueOf(response.getOrDefault("message", "No se pudo rechazar la invitación")));
+                        }
+                    }
+
+                    @Override
+                    protected void propagateError(Throwable ex) {
+                        JOptionPane.showMessageDialog(dashboardWindow, "Error de conexión: " + ex.getMessage());
+                    }
+                }.execute();
+            }
+        });
+
+        dashboardWindow.setOnInviteToGroupListener((group, invitedIds) -> {
+            new NetworkTask<Map<String, Object>>() {
+                @Override
+                protected Map<String, Object> doTask() throws Exception {
+                    return client.inviteToGroup(group.getGroupId(), invitedIds);
+                }
+
+                @Override
+                protected void onSuccess(Map<String, Object> response) {
+                    if (Protocol.RES_OK.equals(String.valueOf(response.get("status")))) {
+                        JOptionPane.showMessageDialog(dashboardWindow,
+                                "Invitación enviada. El usuario verá la invitación y al aceptar podrá ver el historial completo.",
+                                "Grupo", JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        JOptionPane.showMessageDialog(dashboardWindow,
+                                String.valueOf(response.getOrDefault("message", "No se pudo invitar al grupo")),
+                                "Grupo", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+
+                @Override
+                protected void propagateError(Throwable ex) {
+                    JOptionPane.showMessageDialog(dashboardWindow, "Error de comunicación: " + ex.getMessage());
+                }
+            }.execute();
+        });
+
         dashboardWindow.setOnCreateGroupListener((groupName, invitedIds) -> {
             // Ejecutamos la operación de red en un hilo de fondo (NetworkTask = SwingWorker)
             new NetworkTask<Map<String,Object>>() {
@@ -363,7 +443,7 @@ public class Main {
                 new NetworkTask<java.util.Map<String, Object>>() {
                     @Override
                     protected java.util.Map<String, Object> doTask() throws Exception {
-                        return client.getGroupHistory(group.getGroupId(), 100);
+                        return client.getGroupHistory(group.getGroupId(), 500);
                     }
 
                     @Override
@@ -518,7 +598,8 @@ public class Main {
         } else if (Protocol.RES_FRIEND_LIST.equals(status)
                 || Protocol.RES_GROUP_LIST.equals(status)
                 || Protocol.RES_USER_LIST.equals(status)
-                || Protocol.RES_FRIEND_INVITE_LIST.equals(status)) {
+                || Protocol.RES_FRIEND_INVITE_LIST.equals(status)
+                || Protocol.RES_GROUP_INVITE_LIST.equals(status)) {
             if (session != null) {
                 session.absorb(message);
                 refreshDashboardData(session);
@@ -666,7 +747,16 @@ public class Main {
             ));
         }
         dashboardWindow.setGroups(groups);
-        dashboardWindow.setInvitations(new ArrayList<>());
+
+        List<DashboardWindow.GroupInvitation> groupInvites = new ArrayList<>();
+        for (Map<String, Object> invite : data.getGroupInvites()) {
+            int groupId = invite.get("groupId") instanceof Number ? ((Number) invite.get("groupId")).intValue() : -1;
+            int inviterId = invite.get("inviterId") instanceof Number ? ((Number) invite.get("inviterId")).intValue() : -1;
+            String groupName = String.valueOf(invite.getOrDefault("groupName", "Grupo"));
+            String inviterName = String.valueOf(invite.getOrDefault("inviterName", "Usuario"));
+            groupInvites.add(new DashboardWindow.GroupInvitation(inviterName, groupName, groupId, inviterId));
+        }
+        dashboardWindow.setInvitations(groupInvites);
 
         List<DashboardWindow.FriendInvitation> friendInvites = new ArrayList<>();
         for (Map<String, Object> invite : data.getFriendInvites()) {

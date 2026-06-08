@@ -77,4 +77,49 @@ public class GroupMemberDAO {
             return rs.next();
         }
     }
+
+    public boolean isMember(int groupId, int userId) throws SQLException {
+        String sql = "SELECT 1 FROM GroupMembers WHERE group_id = ? AND user_id = ? LIMIT 1";
+        try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
+            stmt.setInt(1, groupId);
+            stmt.setInt(2, userId);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();
+        }
+    }
+
+    public String getMemberStatus(int groupId, int userId) throws SQLException {
+        String sql = "SELECT status FROM GroupMembers WHERE group_id = ? AND user_id = ?";
+        try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
+            stmt.setInt(1, groupId);
+            stmt.setInt(2, userId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("status");
+            }
+        }
+        return null;
+    }
+
+    public void reinviteMember(int groupId, int userId) throws SQLException {
+        String status = getMemberStatus(groupId, userId);
+        if (status == null) {
+            inviteMember(groupId, userId);
+        } else if ("rejected".equals(status)) {
+            updateStatus(groupId, userId, "invited");
+        }
+    }
+
+    public List<Integer> getInvitedGroupIds(int userId) throws SQLException {
+        List<Integer> ids = new ArrayList<>();
+        String sql = "SELECT group_id FROM GroupMembers WHERE user_id = ? AND status = 'invited'";
+        try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                ids.add(rs.getInt("group_id"));
+            }
+        }
+        return ids;
+    }
 }
