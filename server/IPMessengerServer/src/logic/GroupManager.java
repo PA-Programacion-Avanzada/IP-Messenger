@@ -18,25 +18,40 @@ public class GroupManager {
     private UserDAO userDAO = new UserDAO();
 
     public int createGroup(String name, int creatorId, List<Integer> invitedUserIds) throws SQLException {
-        // El grupo debe tener al menos un amigo invitado para que el creador pueda comenzar
-        if (invitedUserIds == null || invitedUserIds.isEmpty()) return -1;
-
-        FriendshipDAO friendshipDAO = new FriendshipDAO();
-        for (int uid : invitedUserIds) {
-            if (!friendshipDAO.areFriends(creatorId, uid)) {
-                return -1;
-            }
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("El nombre del grupo es obligatorio.");
+        }
+        if (invitedUserIds == null) {
+            throw new IllegalArgumentException("Debes seleccionar amigos para crear el grupo.");
         }
 
-        int groupId = groupDAO.createGroup(name, creatorId);
+        FriendshipDAO friendshipDAO = new FriendshipDAO();
+        List<Integer> validInvitedUserIds = new ArrayList<>();
+
+        for (int uid : invitedUserIds) {
+            if (uid == creatorId || validInvitedUserIds.contains(uid)) {
+                continue;
+            }
+            if (!friendshipDAO.areFriends(creatorId, uid)) {
+                throw new IllegalArgumentException("Todos los invitados deben ser amigos aceptados del creador.");
+            }
+            validInvitedUserIds.add(uid);
+        }
+
+        // Minimo 3 personas en total: creador + 2 invitados validos.
+        if (validInvitedUserIds.size() < 2) {
+            throw new IllegalArgumentException("Se requieren al menos 2 amigos invitados (3 personas en total).");
+        }
+
+        int groupId = groupDAO.createGroup(name.trim(), creatorId);
         if (groupId == -1) return -1;
 
         // El creador se agrega como accepted
         memberDAO.inviteMember(groupId, creatorId);
         memberDAO.updateStatus(groupId, creatorId, "accepted");
 
-        // Agregar a los demás miembros directamente como aceptados
-        for (int uid : invitedUserIds) {
+        // Agregar a los demas miembros directamente como aceptados
+        for (int uid : validInvitedUserIds) {
             memberDAO.inviteMember(groupId, uid);
             memberDAO.updateStatus(groupId, uid, "accepted");
         }

@@ -59,15 +59,31 @@ public final class LZ77Compressor {
         while (pos < input.length) {
             int flag = input[pos++] & 0xFF;
             if (flag == 0) {
+                if (pos >= input.length) {
+                    throw new IllegalArgumentException("Payload LZ77 incompleto: falta literal");
+                }
                 out.write(input[pos++]);
-            } else {
+            } else if (flag == 1) {
+                if (pos + 2 >= input.length) {
+                    throw new IllegalArgumentException("Payload LZ77 incompleto: falta referencia");
+                }
                 int offset = ((input[pos++] & 0xFF) << 8) | (input[pos++] & 0xFF);
                 int length = input[pos++] & 0xFF;
                 byte[] buffer = out.toByteArray();
                 int start = buffer.length - offset;
+
+                if (offset <= 0 || offset > buffer.length || start < 0) {
+                    throw new IllegalArgumentException("Referencia LZ77 invalida: offset=" + offset + ", buffer=" + buffer.length);
+                }
+                if (length < 0 || start + length > buffer.length) {
+                    throw new IllegalArgumentException("Referencia LZ77 fuera de rango: start=" + start + ", length=" + length + ", buffer=" + buffer.length);
+                }
+
                 for (int i = 0; i < length; i++) {
                     out.write(buffer[start + i]);
                 }
+            } else {
+                throw new IllegalArgumentException("Flag LZ77 invalido: " + flag);
             }
         }
         return out.toByteArray();

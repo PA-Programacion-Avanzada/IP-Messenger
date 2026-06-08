@@ -151,6 +151,23 @@ public class Client {
         return sendCommand(Protocol.CMD_SEND_FRIEND_REQUEST, data);
     }
 
+    public Map<String, Object> sendTemporaryMessage(int targetUserId, String content) throws IOException {
+        Map<String, Object> data = new HashMap<>();
+        data.put("targetUserId", targetUserId);   // <-- nuevo campo
+        data.put("content", content);
+        return sendCommand(Protocol.CMD_SEND_TEMP_MSG, data);
+    }
+
+    public Map<String, Object> markMessageRead(int messageId) throws IOException {
+        Map<String, Object> data = new HashMap<>();
+        data.put("messageId", messageId);
+        return sendCommand(Protocol.CMD_MARK_MSG_READ, data);
+    }
+
+    public Map<String, Object> getPendingMessages() throws IOException {
+        return sendCommand(Protocol.CMD_GET_PENDING_MSGS, new HashMap<>());
+    }
+
     public Map<String, Object> acceptFriendRequest(int requesterId) throws IOException {
         Map<String, Object> data = new HashMap<>();
         data.put("requesterId", requesterId);

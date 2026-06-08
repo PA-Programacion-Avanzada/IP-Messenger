@@ -10,6 +10,17 @@ import java.util.List;
 public class MessageManager {
     private MessageDAO messageDAO = new MessageDAO();
 
+    public void saveTemporaryMessage(int senderId, int receiverId, String content) throws SQLException {
+        Message msg = new Message();
+        msg.setSenderId(senderId);
+        msg.setReceiverType("user");                 // siempre a un usuario
+        msg.setReceiverId(receiverId);
+        msg.setContent(content);
+        msg.setStatus("pending");                     // <‑‑ marca como pendiente
+        // el timestamp se asigna automáticamente por la BD (DEFAULT CURRENT_TIMESTAMP)
+        messageDAO.saveMessage(msg);
+    }
+
     public void sendFriendMessage(int senderId, int receiverId, String content) throws SQLException {
         Message msg = new Message();
         msg.setSenderId(senderId);
@@ -35,7 +46,7 @@ public class MessageManager {
     }
 
     public void markMessageRead(int messageId) throws SQLException {
-        messageDAO.markAsRead(messageId);
+        messageDAO.markAsDelivered(messageId);
     }
 
     public List<Message> getFriendHistory(int userId, int friendId, int limit) throws SQLException {
