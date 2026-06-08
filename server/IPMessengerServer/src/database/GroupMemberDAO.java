@@ -67,4 +67,14 @@ public class GroupMemberDAO {
             stmt.executeUpdate();
         }
     }
+
+    public boolean isAcceptedMember(int groupId, int userId) throws SQLException {
+        String sql = "SELECT 1 FROM GroupMembers WHERE group_id = ? AND user_id = ? AND status = 'accepted' LIMIT 1";
+        try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
+            stmt.setInt(1, groupId);
+            stmt.setInt(2, userId);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();
+        }
+    }
 }

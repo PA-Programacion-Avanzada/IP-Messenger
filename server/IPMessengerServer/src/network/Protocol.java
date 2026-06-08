@@ -22,8 +22,8 @@ public class Protocol {
     public static final String CMD_LEAVE_GROUP = "LEAVE_GROUP";
     public static final String CMD_GET_PENDING_MSGS = "GET_PENDING_MSGS";
     public static final String CMD_MARK_MSG_READ = "MARK_MSG_READ";
-    // Add new command and response for friend history
     public static final String CMD_GET_FRIEND_HISTORY = "GET_FRIEND_HISTORY";
+    public static final String CMD_GET_GROUP_HISTORY = "GET_GROUP_HISTORY";
 
     // Respuestas del servidor
     public static final String RES_OK = "OK";
@@ -39,4 +39,5 @@ public class Protocol {
     public static final String RES_PENDING_MESSAGES = "PENDING_MESSAGES";
     public static final String RES_NEW_MESSAGE = "NEW_MESSAGE";
     public static final String RES_FRIEND_HISTORY = "FRIEND_HISTORY";
+    public static final String RES_GROUP_HISTORY = "RES_GROUP_HISTORY";
 }

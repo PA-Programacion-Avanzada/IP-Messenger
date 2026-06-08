@@ -20,9 +20,10 @@ public final class Protocol {
     public static final String CMD_GET_FRIEND_INVITES = "GET_FRIEND_INVITES";
     public static final String CMD_LEAVE_GROUP = "LEAVE_GROUP";
 
-    // Add new command and response for friend history
     public static final String CMD_GET_FRIEND_HISTORY = "GET_FRIEND_HISTORY";
+    public static final String CMD_GET_GROUP_HISTORY = "GET_GROUP_HISTORY";
     public static final String RES_FRIEND_HISTORY = "FRIEND_HISTORY";
+    public static final String RES_GROUP_HISTORY = "RES_GROUP_HISTORY";
     public static final String RES_OK = "OK";
     public static final String RES_FRIEND_INVITE_LIST = "FRIEND_INVITE_LIST";
     public static final String RES_ERROR = "ERROR";
