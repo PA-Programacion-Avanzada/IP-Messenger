@@ -1,20 +1,22 @@
-# NetBeans (solo local, no subir al repo)
+# NetBeans — configuración local (rutas, JDK, usuario). No subir al repo.
 **/nbproject/
+**/nbproject/private/
+**/private.properties
+**/genfiles.properties
 
 # Artefactos de build
 **/build/
 **/dist/
+**/out/
 
 # Base de datos local
 messenger.db
 **/*.db
 **/*.db-journal
 
-# IDE
+# IDE / SO
 .idea/
 *.iml
 .vscode/
-
-
-./server/IPMessengerServer/nbproject/project.properties
-./server/IPMessengerClient/nbproject/project.properties
+.DS_Store
+**/.DS_Store
