@@ -101,6 +101,10 @@ public class Client {
             if (Protocol.RES_LOGIN_FAIL.equals(status) || Protocol.RES_NEED_REGISTER.equals(status)) {
                 throw new IOException(String.valueOf(firstResponse.getOrDefault("message", "Credenciales incorrectas")));
             }
+            if (Protocol.RES_NEED_RECOVER.equals(status)) {
+                String message = String.valueOf(firstResponse.getOrDefault("message", "Recupera tu contraseña para continuar"));
+                throw new IOException("NEED_RECOVER::" + message);
+            }
             if (!Protocol.RES_LOGIN_SUCCESS.equals(status)) {
                 throw new IOException("Respuesta de login inesperada: " + status);
             }
@@ -133,9 +137,7 @@ public class Client {
     }
 
     public Map<String, Object> sendGeneralMessage(String content) throws IOException {
-        Map<String, Object> data = new HashMap<>();
-        data.put("content", content);
-        return sendCommand(Protocol.CMD_SEND_TEMP_MSG, data);
+        throw new IOException("Los mensajes temporales deben ser 1 a 1. Selecciona un usuario destino.");
     }
 
     public Map<String, Object> sendGroupMessage(int groupId, String content) throws IOException {

@@ -436,11 +436,9 @@ public class DashboardWindow extends JFrame {
         tempMsgBtn.setFocusPainted(false);
         tempMsgBtn.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
         tempMsgBtn.addActionListener(e -> {
-            // Se puede abrir un diálogo para escribir mensaje temporal
-            String message = JOptionPane.showInputDialog(this, "Mensaje para todos los usuarios conectados:");
-            if (message != null && !message.trim().isEmpty() && onSendTemporaryMessageListener != null) {
-                onSendTemporaryMessageListener.onSendTemporaryMessage(message.trim(), null);
-            }
+            JOptionPane.showMessageDialog(this,
+                    "Usa el botón 'Temp' en un usuario específico para enviar mensaje temporal 1 a 1.",
+                    "Mensaje temporal", JOptionPane.INFORMATION_MESSAGE);
         });
         panel.add(tempMsgBtn, BorderLayout.SOUTH);
 
@@ -805,6 +803,29 @@ public class DashboardWindow extends JFrame {
             if (onUserActionListener != null) onUserActionListener.onUserAction(user);
         });
         row.add(actionBtn);
+
+        row.add(Box.createRigidArea(new Dimension(6, 0)));
+
+        JButton tempBtn = new JButton("Temp");
+        tempBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        tempBtn.setFocusPainted(false);
+        tempBtn.setBackground(new Color(0, 123, 255));
+        tempBtn.setForeground(Color.WHITE);
+        tempBtn.setToolTipText("Enviar mensaje temporal a este usuario");
+        tempBtn.setMinimumSize(btnSize);
+        tempBtn.setPreferredSize(btnSize);
+        tempBtn.setMaximumSize(btnSize);
+        tempBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        tempBtn.addActionListener(e -> {
+            if (onSendTemporaryMessageListener == null) {
+                return;
+            }
+            String message = JOptionPane.showInputDialog(this, "Mensaje temporal para " + user.getName() + ":");
+            if (message != null && !message.trim().isEmpty()) {
+                onSendTemporaryMessageListener.onSendTemporaryMessage(message.trim(), user);
+            }
+        });
+        row.add(tempBtn);
 
         // Evita que la fila se estire verticalmente
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));

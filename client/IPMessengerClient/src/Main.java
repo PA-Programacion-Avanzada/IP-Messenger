@@ -89,6 +89,14 @@ public class Main {
                 Throwable cause = (ex instanceof ExecutionException && ex.getCause() != null)
                         ? ex.getCause() : ex;
 
+                if (cause instanceof IOException ioEx && ioEx.getMessage() != null
+                        && ioEx.getMessage().startsWith("NEED_RECOVER::")) {
+                    String msg = ioEx.getMessage().substring("NEED_RECOVER::".length());
+                    startWindow.showError(msg);
+                    onForgotPasswordClicked();
+                    return;
+                }
+
                 String mensaje;
                 if (cause instanceof java.net.ConnectException) {
                     mensaje = "No se encontró ningún servidor en la IP " +
@@ -297,19 +305,24 @@ public class Main {
 
         dashboardWindow.setOnSendTemporaryMessageListener((message, targetUser) -> {
             try {
-                Map<String, Object> response;
-                if (targetUser != null) {
-                    response = client.sendTemporaryMessage(targetUser.getUserId(), message);
-                } else {
-                    response = client.sendGeneralMessage(message);
+                if (targetUser == null) {
+                    JOptionPane.showMessageDialog(dashboardWindow,
+                            "Selecciona un usuario específico para mensaje temporal.",
+                            "Mensaje temporal", JOptionPane.WARNING_MESSAGE);
+                    return;
                 }
+
+                Map<String, Object> response;
+                response = client.sendTemporaryMessage(targetUser.getUserId(), message);
 
                 String status = String.valueOf(response.get("status"));
                 if (Protocol.RES_OK.equals(status)) {
+                    updateConversation(targetUser.getUserId(), targetUser.getName(), message, false);
                 } else if ("PENDING".equalsIgnoreCase(status)) {
                     JOptionPane.showMessageDialog(dashboardWindow,
                             "El usuario está offline; el mensaje se guardó como pendiente.",
                             "Mensaje pendiente", JOptionPane.INFORMATION_MESSAGE);
+                    updateConversation(targetUser.getUserId(), targetUser.getName(), message, false);
                     refreshPendingBadge();
                 } else {
                     JOptionPane.showMessageDialog(dashboardWindow,
@@ -776,6 +789,15 @@ public class Main {
             return;
         }
 
+        if ("temporary".equals(type)) {
+            updateConversation(senderId, senderName, content, true);
+            JOptionPane.showMessageDialog(dashboardWindow,
+                senderName + " (temporal): " + content,
+                "Nuevo mensaje temporal",
+                JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
         if (senderId != session.getUserId() && !senderName.equals(session.getUsername())) {
             String time = String.valueOf(message.getOrDefault("timestamp", LocalTime.now().format(TIME_FORMAT)));
             FriendRequestModal openModal = openFriendModals.get(senderId);
@@ -820,8 +842,10 @@ public class Main {
         }
 
         List<DashboardWindow.FriendConversation> friendConversations = new ArrayList<>();
+        java.util.Set<Integer> friendIds = new java.util.HashSet<>();
         for (Map<String, Object> friend : data.getFriends()) {
             int friendId = ((Number) friend.get("id")).intValue();
+            friendIds.add(friendId);
             String friendName = String.valueOf(friend.get("username"));
             boolean online = Boolean.TRUE.equals(friend.get("online"));
             DashboardWindow.FriendConversation existing = conversationsByUserId.get(friendId);
@@ -836,6 +860,12 @@ public class Main {
                         online,
                         friendId
                 ));
+            }
+        }
+
+        for (Map.Entry<Integer, DashboardWindow.FriendConversation> entry : conversationsByUserId.entrySet()) {
+            if (!friendIds.contains(entry.getKey())) {
+                friendConversations.add(entry.getValue());
             }
         }
         dashboardWindow.setFriendConversations(friendConversations);

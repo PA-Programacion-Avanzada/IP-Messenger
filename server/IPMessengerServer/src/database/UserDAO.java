@@ -83,4 +83,33 @@ public class UserDAO {
         }
         return null;
     }
+
+    public int incrementFailedAttempts(String username) throws SQLException {
+        String updateSql = "UPDATE Users SET failed_attempt_count = COALESCE(failed_attempt_count, 0) + 1, last_failed_attempt = CURRENT_TIMESTAMP WHERE username = ?";
+        try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(updateSql)) {
+            stmt.setString(1, username);
+            stmt.executeUpdate();
+        }
+        return getFailedAttempts(username);
+    }
+
+    public int getFailedAttempts(String username) throws SQLException {
+        String sql = "SELECT COALESCE(failed_attempt_count, 0) AS failed_attempt_count FROM Users WHERE username = ?";
+        try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
+            stmt.setString(1, username);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("failed_attempt_count");
+            }
+        }
+        return 0;
+    }
+
+    public void resetFailedAttempts(String username) throws SQLException {
+        String sql = "UPDATE Users SET failed_attempt_count = 0, last_failed_attempt = NULL WHERE username = ?";
+        try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
+            stmt.setString(1, username);
+            stmt.executeUpdate();
+        }
+    }
 }

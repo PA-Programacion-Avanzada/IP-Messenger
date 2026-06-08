@@ -93,6 +93,20 @@ public class DatabaseManager {
             for (String sql : statements) {
                 stmt.execute(sql);
             }
+
+            ensureColumn(stmt, "Users", "failed_attempt_count", "INTEGER DEFAULT 0");
+            ensureColumn(stmt, "Users", "last_failed_attempt", "DATETIME");
+        }
+    }
+
+    private static void ensureColumn(Statement stmt, String table, String column, String definition) throws SQLException {
+        try {
+            stmt.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+        } catch (SQLException ex) {
+            String message = ex.getMessage() == null ? "" : ex.getMessage().toLowerCase();
+            if (!message.contains("duplicate column") && !message.contains("already exists")) {
+                throw ex;
+            }
         }
     }
 }

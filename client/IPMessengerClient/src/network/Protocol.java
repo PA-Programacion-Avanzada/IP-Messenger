@@ -32,6 +32,7 @@ public final class Protocol {
     public static final String RES_LOGIN_SUCCESS = "LOGIN_SUCCESS";
     public static final String RES_LOGIN_FAIL = "LOGIN_FAIL";
     public static final String RES_NEED_REGISTER = "NEED_REGISTER";
+    public static final String RES_NEED_RECOVER = "NEED_RECOVER";
     public static final String RES_FRIEND_LIST = "FRIEND_LIST";
     public static final String RES_GROUP_LIST = "GROUP_LIST";
     public static final String RES_USER_LIST = "USER_LIST";

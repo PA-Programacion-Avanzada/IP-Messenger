@@ -13,6 +13,7 @@ import java.io.*;
 import java.net.Socket;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,10 +25,9 @@ public class ClientHandler implements Runnable {
     private InputStream input;
     private OutputStream output;
     private User currentUser;
-    private int loginAttempts = 0;
 
     // Mapa estático para mantener usuarios conectados (username -> ClientHandler)
-    private static final Map<String, ClientHandler> connectedClients = new HashMap<>();
+    private static final ConcurrentHashMap<String, ClientHandler> connectedClients = new ConcurrentHashMap<>();
 
     public ClientHandler(Socket socket) {
         this.socket = socket;
@@ -177,11 +177,9 @@ public class ClientHandler implements Runnable {
         User user = userManager.authenticate(username, password);
         if (user != null) {
             currentUser = user;
-            loginAttempts = 0;
+            userManager.resetFailedLoginAttempts(username);
             // Registrar en conectados
-            synchronized (connectedClients) {
-                connectedClients.put(username, this);
-            }
+            connectedClients.put(username, this);
             // Enviar éxito
             Map<String, Object> response = new HashMap<>();
             response.put("status", Protocol.RES_LOGIN_SUCCESS);
@@ -196,14 +194,15 @@ public class ClientHandler implements Runnable {
             sendGroupInviteList();
             scheduleUserListBroadcast();
         } else {
-            loginAttempts++;
+            int failedAttempts = userManager.recordFailedLoginAttempt(username);
             Map<String, Object> response = new HashMap<>();
-            if (loginAttempts >= 3) {
-                response.put("status", Protocol.RES_NEED_REGISTER);
-                response.put("message", "Demasiados intentos fallidos. Regístrate o recupera contraseña.");
+            if (failedAttempts >= 3) {
+                response.put("status", Protocol.RES_NEED_RECOVER);
+                response.put("message", "Demasiados intentos fallidos. Recupera tu contraseña para continuar.");
             } else {
                 response.put("status", Protocol.RES_LOGIN_FAIL);
-                response.put("message", "Credenciales incorrectas. Intentos restantes: " + (3 - loginAttempts));
+                int remaining = Math.max(0, 3 - failedAttempts);
+                response.put("message", "Credenciales incorrectas. Intentos restantes: " + remaining);
             }
             sendMessage(response);
         }
@@ -294,14 +293,12 @@ public class ClientHandler implements Runnable {
     private List<Map<String, Object>> getAllUsersExcept(int userId) throws SQLException {
         List<User> users = new UserDAO().findAllExcept(userId);
         List<Map<String, Object>> result = new java.util.ArrayList<>();
-        synchronized (connectedClients) {
-            for (User user : users) {
-                Map<String, Object> map = new HashMap<>();
-                map.put("id", user.getId());
-                map.put("username", user.getUsername());
-                map.put("online", connectedClients.containsKey(user.getUsername()));
-                result.add(map);
-            }
+        for (User user : users) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", user.getId());
+            map.put("username", user.getUsername());
+            map.put("online", connectedClients.containsKey(user.getUsername()));
+            result.add(map);
         }
         return result;
     }
@@ -311,14 +308,12 @@ public class ClientHandler implements Runnable {
     }
 
     private void broadcastUserList() {
-        synchronized (connectedClients) {
-            for (ClientHandler handler : connectedClients.values()) {
-                if (handler != this && handler.currentUser != null) {
-                    try {
-                        handler.sendAllUsers();
-                    } catch (Exception e) {
-                        Logger.log("No se pudo actualizar la lista de usuarios: " + e.getMessage());
-                    }
+        for (ClientHandler handler : connectedClients.values()) {
+            if (handler != this && handler.currentUser != null) {
+                try {
+                    handler.sendAllUsers();
+                } catch (Exception e) {
+                    Logger.log("No se pudo actualizar la lista de usuarios: " + e.getMessage());
                 }
             }
         }
@@ -351,44 +346,38 @@ public class ClientHandler implements Runnable {
     }
 
     private void sendFriendInviteUpdateToUser(int userId) {
-        synchronized (connectedClients) {
-            try {
-                User target = new UserDAO().findById(userId);
-                if (target == null) return;
-                ClientHandler handler = connectedClients.get(target.getUsername());
-                if (handler != null) {
-                    handler.sendFriendInviteList();
-                }
-            } catch (Exception ignored) {
+        try {
+            User target = new UserDAO().findById(userId);
+            if (target == null) return;
+            ClientHandler handler = connectedClients.get(target.getUsername());
+            if (handler != null) {
+                handler.sendFriendInviteList();
             }
+        } catch (Exception ignored) {
         }
     }
 
     private void sendFriendListToUser(int userId) {
-        synchronized (connectedClients) {
-            try {
-                User target = new UserDAO().findById(userId);
-                if (target == null) return;
-                ClientHandler handler = connectedClients.get(target.getUsername());
-                if (handler != null) {
-                    handler.sendFriendList();
-                }
-            } catch (Exception ignored) {
+        try {
+            User target = new UserDAO().findById(userId);
+            if (target == null) return;
+            ClientHandler handler = connectedClients.get(target.getUsername());
+            if (handler != null) {
+                handler.sendFriendList();
             }
+        } catch (Exception ignored) {
         }
     }
 
     private void sendGroupListToUser(int userId) {
-        synchronized (connectedClients) {
-            try {
-                User target = new UserDAO().findById(userId);
-                if (target == null) return;
-                ClientHandler handler = connectedClients.get(target.getUsername());
-                if (handler != null) {
-                    handler.sendGroupList();
-                }
-            } catch (Exception ignored) {
+        try {
+            User target = new UserDAO().findById(userId);
+            if (target == null) return;
+            ClientHandler handler = connectedClients.get(target.getUsername());
+            if (handler != null) {
+                handler.sendGroupList();
             }
+        } catch (Exception ignored) {
         }
     }
 
@@ -402,16 +391,14 @@ public class ClientHandler implements Runnable {
     }
 
     private void sendGroupInviteListToUser(int userId) {
-        synchronized (connectedClients) {
-            try {
-                User target = new UserDAO().findById(userId);
-                if (target == null) return;
-                ClientHandler handler = connectedClients.get(target.getUsername());
-                if (handler != null) {
-                    handler.sendGroupInviteList();
-                }
-            } catch (Exception ignored) {
+        try {
+            User target = new UserDAO().findById(userId);
+            if (target == null) return;
+            ClientHandler handler = connectedClients.get(target.getUsername());
+            if (handler != null) {
+                handler.sendGroupInviteList();
             }
+        } catch (Exception ignored) {
         }
     }
 
@@ -467,11 +454,9 @@ public class ClientHandler implements Runnable {
         mm.sendFriendMessage(currentUser.getId(), friendId, content);
         // Si el amigo está conectado, enviarle el mensaje en tiempo real
         ClientHandler friendHandler;
-        synchronized (connectedClients) {
-            // Necesitamos obtener el username del amigo por su ID, luego buscarlo en connectedClients
-            String friendUsername = getUsernameById(friendId);
-            friendHandler = connectedClients.get(friendUsername);
-        }
+        // Necesitamos obtener el username del amigo por su ID, luego buscarlo en connectedClients
+        String friendUsername = getUsernameById(friendId);
+        friendHandler = connectedClients.get(friendUsername);
         if (friendHandler != null) {
             Map<String, Object> newMsg = new HashMap<>();
             newMsg.put("status", Protocol.RES_NEW_MESSAGE);
@@ -521,24 +506,44 @@ public class ClientHandler implements Runnable {
     }
 
     private void handleSendTempMsg(Map<String, Object> data) throws IOException, SQLException {
+        if (data == null) {
+            sendError("Datos inválidos para mensaje temporal");
+            return;
+        }
+
         String content = (String) data.get("content");
-        Integer targetId = (Integer) data.get("targetUserId");   // nuevo campo
+        Integer targetId = (data.get("targetUserId") instanceof Number n) ? n.intValue() : null;
         if (content == null || content.trim().isEmpty()) {
-            sendError("El mensaje general no puede estar vacío");
+            sendError("El mensaje temporal no puede estar vacío");
+            return;
+        }
+
+        if (targetId == null) {
+            sendError("targetUserId es obligatorio para mensaje temporal 1 a 1");
             return;
         }
 
         // Si el remitente envía a sí mismo, ignoramos (no tiene sentido)
-        if (targetId != null && targetId == currentUser.getId()) {
+        if (targetId == currentUser.getId()) {
             sendError("No puedes enviarte un mensaje a ti mismo");
+            return;
+        }
+
+        User targetUser = new UserDAO().findById(targetId);
+        if (targetUser == null) {
+            sendError("El usuario destino no existe");
+            return;
+        }
+
+        FriendshipManager friendshipManager = new FriendshipManager();
+        if (friendshipManager.areFriends(currentUser.getId(), targetId)) {
+            sendError("Los mensajes temporales no se permiten entre amigos");
             return;
         }
 
         // Guardamos el mensaje **siempre** como "pending"
         MessageManager mm = new MessageManager();
-        if (targetId != null) {
-            mm.saveTemporaryMessage(currentUser.getId(), targetId, content);
-        }
+        mm.saveTemporaryMessage(currentUser.getId(), targetId, content);
 
         // Construir el mensaje que se enviará a los clientes conectados (solo a los online)
         Map<String, Object> newMsg = new HashMap<>();
@@ -549,29 +554,18 @@ public class ClientHandler implements Runnable {
         newMsg.put("type", "temporary");   // nuevo tipo “temporary”
 
         // Si el destinatario está online enviamos en tiempo real, de lo contrario no.
-        if (targetId != null) {
-            ClientHandler targetHandler = connectedClients.get(getUsernameById(targetId));
-            if (targetHandler != null) {                      // está conectado
-                newMsg.put("targetUserId", targetId);
-                targetHandler.sendMessage(newMsg);
-                // También podemos marcar el mensaje como “delivered” en BD, pero no es obligatorio para la UI.
-            } else {
-                // Destinatario offline → devolvemos al remitente que el mensaje quedó pendiente
-                Map<String, Object> resp = new HashMap<>();
-                resp.put("status", "PENDING");                 // <‑‑ nuevo status que el cliente debe interpretar
-                resp.put("message", "Mensaje almacenado como pendiente");
-                sendMessage(resp);
-                return;
-            }
+        ClientHandler targetHandler = connectedClients.get(targetUser.getUsername());
+        if (targetHandler != null) {                      // está conectado
+            newMsg.put("targetUserId", targetId);
+            targetHandler.sendMessage(newMsg);
+            // También podemos marcar el mensaje como “delivered” en BD, pero no es obligatorio para la UI.
         } else {
-            // Broadcast a todos (sin destinatario concreto)
-            synchronized (connectedClients) {
-                for (ClientHandler handler : connectedClients.values()) {
-                    if (handler != this) {
-                        handler.sendMessage(newMsg);
-                    }
-                }
-            }
+            // Destinatario offline → devolvemos al remitente que el mensaje quedó pendiente
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("status", "PENDING");                 // <‑‑ nuevo status que el cliente debe interpretar
+            resp.put("message", "Mensaje almacenado como pendiente");
+            sendMessage(resp);
+            return;
         }
 
         // Si llegamos aquí, el mensaje se entregó en tiempo real → respondemos OK
@@ -612,20 +606,18 @@ public class ClientHandler implements Runnable {
         // Reenviar a todos los miembros del grupo que estén conectados
         GroupManager gm = new GroupManager();
         List<User> members = gm.getGroupMembers(groupId);
-        synchronized (connectedClients) {
-            for (User m : members) {
-                if (m.getId() == currentUser.getId()) continue;
-                ClientHandler ch = connectedClients.get(m.getUsername());
-                if (ch != null) {
-                    Map<String, Object> newMsg = new HashMap<>();
-                    newMsg.put("status", Protocol.RES_NEW_MESSAGE);
-                    newMsg.put("groupId", groupId);
-                    newMsg.put("senderId", currentUser.getId());
-                    newMsg.put("senderUsername", currentUser.getUsername());
-                    newMsg.put("content", content);
-                    newMsg.put("type", "group");
-                    ch.sendMessage(newMsg);
-                }
+        for (User m : members) {
+            if (m.getId() == currentUser.getId()) continue;
+            ClientHandler ch = connectedClients.get(m.getUsername());
+            if (ch != null) {
+                Map<String, Object> newMsg = new HashMap<>();
+                newMsg.put("status", Protocol.RES_NEW_MESSAGE);
+                newMsg.put("groupId", groupId);
+                newMsg.put("senderId", currentUser.getId());
+                newMsg.put("senderUsername", currentUser.getUsername());
+                newMsg.put("content", content);
+                newMsg.put("type", "group");
+                ch.sendMessage(newMsg);
             }
         }
         Map<String, Object> response = new HashMap<>();
@@ -802,9 +794,7 @@ public class ClientHandler implements Runnable {
         try {
             if (currentUser != null) {
                 new UserManager().setUserOffline(currentUser.getId());
-                synchronized (connectedClients) {
-                    connectedClients.remove(currentUser.getUsername());
-                }
+                connectedClients.remove(currentUser.getUsername());
                 scheduleUserListBroadcast();
             }
             if (socket != null && !socket.isClosed()) socket.close();

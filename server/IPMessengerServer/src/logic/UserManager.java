@@ -26,7 +26,25 @@ public class UserManager {
     public boolean recoverPassword(String username, String newPassword) throws SQLException {
         User user = userDAO.findByUsername(username);
         if (user == null) return false;
-        return userDAO.updatePassword(user.getId(), hashPassword(newPassword));
+        boolean updated = userDAO.updatePassword(user.getId(), hashPassword(newPassword));
+        if (updated) {
+            userDAO.resetFailedAttempts(username);
+        }
+        return updated;
+    }
+
+    public int recordFailedLoginAttempt(String username) throws SQLException {
+        if (username == null || username.trim().isEmpty()) {
+            return 0;
+        }
+        return userDAO.incrementFailedAttempts(username.trim());
+    }
+
+    public void resetFailedLoginAttempts(String username) throws SQLException {
+        if (username == null || username.trim().isEmpty()) {
+            return;
+        }
+        userDAO.resetFailedAttempts(username.trim());
     }
 
     private String hashPassword(String password) {
