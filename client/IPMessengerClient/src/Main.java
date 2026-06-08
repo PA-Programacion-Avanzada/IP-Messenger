@@ -400,36 +400,6 @@ public class Main {
             }
         }); // <-- cierra setOnGroupSelectedListener
 
-        dashboardWindow.setOnCreateGroupListener((groupName, memberIds) -> {
-            if (groupName == null || groupName.trim().isEmpty()) {
-                JOptionPane.showMessageDialog(dashboardWindow, "El nombre del grupo es obligatorio.");
-                return;
-            }
-
-            new Thread(() -> {
-                try {
-                    java.util.Map<String, Object> params = new java.util.HashMap<>();
-                    params.put("name", groupName);
-                    params.put("members", memberIds);
-
-                    java.util.Map<String, Object> response = client.sendCommand("CREATE_GROUP", params);
-
-                    javax.swing.SwingUtilities.invokeLater(() -> {
-                        if (response != null && "OK".equals(String.valueOf(response.get("status")))) {
-                            JOptionPane.showMessageDialog(dashboardWindow, "Grupo '" + groupName + "' creado exitosamente.");
-                        } else {
-                            String msg = (response != null) ? String.valueOf(response.getOrDefault("message", "Error desconocido")) : "Sin respuesta del servidor";
-                            JOptionPane.showMessageDialog(dashboardWindow, "No se pudo crear el grupo: " + msg);
-                        }
-                    });
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                    javax.swing.SwingUtilities.invokeLater(() ->
-                        JOptionPane.showMessageDialog(dashboardWindow, "Error de red: " + ex.getMessage()));
-                }
-            }).start();
-        }); // <-- cierra setOnCreateGroupListener
-
         dashboardWindow.setVisible(true);
     } // <-- cierra showDashboardWindow
 

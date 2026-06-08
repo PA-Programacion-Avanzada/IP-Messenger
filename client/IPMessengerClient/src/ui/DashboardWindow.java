@@ -521,7 +521,7 @@ public class DashboardWindow extends JFrame {
                 java.util.List<Integer> ids = new java.util.ArrayList<>();
                 for (FriendConversation fc : pickList.getSelectedValuesList()) ids.add(fc.getFriendId());
                 if (gname.isEmpty()) { JOptionPane.showMessageDialog(dlg, "Especifica un nombre para el grupo"); return; }
-                if (ids.isEmpty()) { JOptionPane.showMessageDialog(dlg, "Selecciona al menos un amigo para invitar"); return; }
+                if (ids.size() < 2) { JOptionPane.showMessageDialog(dlg, "Selecciona al menos dos amigos para crear un grupo de minimo 3 usuarios, contando contigo"); return; }
                 if (onCreateGroupListener != null) onCreateGroupListener.onCreateGroup(gname, ids);
                 dlg.dispose();
             });

@@ -16,25 +16,34 @@ public class GroupManager {
     private UserDAO userDAO = new UserDAO();
 
     public int createGroup(String name, int creatorId, List<Integer> invitedUserIds) throws SQLException {
-        // El grupo debe tener al menos un amigo invitado para que el creador pueda comenzar
-        if (invitedUserIds == null || invitedUserIds.isEmpty()) return -1;
+        if (name == null || name.trim().isEmpty()) return -1;
+        if (invitedUserIds == null) return -1;
 
         FriendshipDAO friendshipDAO = new FriendshipDAO();
+        List<Integer> validInvitedUserIds = new ArrayList<>();
+
         for (int uid : invitedUserIds) {
+            if (uid == creatorId || validInvitedUserIds.contains(uid)) {
+                continue;
+            }
             if (!friendshipDAO.areFriends(creatorId, uid)) {
                 return -1;
             }
+            validInvitedUserIds.add(uid);
         }
 
-        int groupId = groupDAO.createGroup(name, creatorId);
+        // Regla de negocio: minimo 3 usuarios en total, contando al creador.
+        if (validInvitedUserIds.size() < 2) return -1;
+
+        int groupId = groupDAO.createGroup(name.trim(), creatorId);
         if (groupId == -1) return -1;
 
         // El creador se agrega como accepted
         memberDAO.inviteMember(groupId, creatorId);
         memberDAO.updateStatus(groupId, creatorId, "accepted");
 
-        // Agregar a los demás miembros directamente como aceptados
-        for (int uid : invitedUserIds) {
+        // Agregar a los demas miembros directamente como aceptados
+        for (int uid : validInvitedUserIds) {
             memberDAO.inviteMember(groupId, uid);
             memberDAO.updateStatus(groupId, uid, "accepted");
         }
