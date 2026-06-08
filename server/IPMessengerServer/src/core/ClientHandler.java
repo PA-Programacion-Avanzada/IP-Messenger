@@ -120,6 +120,9 @@ public class ClientHandler implements Runnable {
                     case "GET_GROUP_HISTORY":
                         handleGetGroupHistory(data);
                         break;
+                    case "GET_FRIEND_HISTORY":
+                        handleGetFriendHistory(data);
+                        break;
             
                     // ... otros comandos
                     default:
@@ -214,6 +217,29 @@ public class ClientHandler implements Runnable {
 
     private void handleGetFriendInvites() throws SQLException, IOException {
         sendFriendInviteList();
+    }
+
+    private void handleGetFriendHistory(Map<String, Object> data) throws SQLException, IOException {
+        int friendId = ((Number) data.get("friendId")).intValue();
+        int limit   = data.containsKey("limit") ? ((Number) data.get("limit")).intValue() : 100;
+
+        MessageManager mm = new MessageManager();
+        List<models.Message> msgs = mm.getFriendHistory(currentUser.getId(), friendId, limit);
+
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (models.Message m : msgs) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("content", m.getContent());
+            map.put("senderUsername", getUsernameById(m.getSenderId()));
+            map.put("timestamp", m.getTimestamp().toString());
+            list.add(map);
+        }
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("status", Protocol.RES_FRIEND_HISTORY);
+        resp.put("friendId", friendId);
+        resp.put("messages", list);
+        sendMessage(resp);
     }
 
     private void handleGetAllUsers() throws SQLException, IOException {

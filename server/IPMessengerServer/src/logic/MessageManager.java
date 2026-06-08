@@ -3,6 +3,7 @@ package logic;
 import database.MessageDAO;
 import models.Message;
 import network.JSONParser;
+
 import java.sql.SQLException;
 import java.util.List;
 
@@ -37,11 +38,15 @@ public class MessageManager {
         messageDAO.markAsRead(messageId);
     }
 
+    public List<Message> getFriendHistory(int userId, int friendId, int limit) throws SQLException {
+        return messageDAO.getFriendMessages(userId, friendId, limit);
+    }
     public List<Message> getGroupMessages(int groupId, int limit) throws SQLException {
         return messageDAO.getGroupMessages(groupId, limit);
     }
+
     public List<Message> getGroupMessages(int groupId) throws SQLException {
-    // Llamamos al método original usando un límite estándar (ej. 100 mensajes)
-    return messageDAO.getGroupMessages(groupId, 100);
-}
+        // Llamamos al método original usando un límite estándar (ej. 100 mensajes)
+        return messageDAO.getGroupMessages(groupId, 100);
+    }
 }

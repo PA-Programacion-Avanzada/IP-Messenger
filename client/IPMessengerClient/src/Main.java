@@ -434,23 +434,74 @@ public class Main {
     } // <-- cierra showDashboardWindow
 
     private void openChatWithUser(int userId, String username) {
-        FriendRequestModal chatModal = new FriendRequestModal(dashboardWindow, username);
-        chatModal.setOnSendFriendMessageListener((recipient, message) -> {
-            try {
-                Map<String, Object> response = client.sendFriendMessage(userId, message);
-                if (Protocol.RES_OK.equals(String.valueOf(response.get("status")))) {
-                    updateConversation(userId, username, message, false);
-                    chatModal.dispose();
-                } else {
-                    JOptionPane.showMessageDialog(chatModal,
-                            String.valueOf(response.getOrDefault("message", "No se pudo enviar el mensaje")));
+        // Retrieve history (run in background)
+        new NetworkTask<List<FriendRequestModal.ChatMessage>>() {
+            @Override
+            protected List<FriendRequestModal.ChatMessage> doTask() throws Exception {
+                Map<String, Object> resp = client.getFriendHistory(userId, 200); // 200 msgs max
+                List<FriendRequestModal.ChatMessage> msgs = new ArrayList<>();
+                List<?> raw = (List<?>) resp.get("messages");
+                for (Object o : raw) {
+                    if (o instanceof Map<?, ?> m) {
+                        String sender  = String.valueOf(m.get("senderUsername"));
+                        String content = String.valueOf(m.get("content"));
+
+                        Object tsObj = m.get("timestamp");               // get the raw object
+                        String ts = (tsObj != null ? tsObj.toString() // convert safely to String
+                                                : "");               // fallback if null
+
+                        boolean mine = sender.equals(session.getUsername());
+                        msgs.add(new FriendRequestModal.ChatMessage(
+                                sender, content, ts, mine, false));
+                    }
                 }
-            } catch (IOException ex) {
-                JOptionPane.showMessageDialog(chatModal, "Error de conexión: " + ex.getMessage());
+                return msgs;
             }
-        });
-        chatModal.setOnCancelListener(chatModal::dispose);
-        chatModal.setVisible(true);
+
+            @Override
+            protected void onSuccess(List<FriendRequestModal.ChatMessage> history) {
+                // Build the modal and inject the history
+                FriendRequestModal chatModal = new FriendRequestModal(dashboardWindow, username);
+                chatModal.setMessages(history);
+                chatModal.setOnSendFriendMessageListener((recipient, message) -> {
+                    try {
+                        Map<String, Object> response = client.sendFriendMessage(userId, message);
+                        if (Protocol.RES_OK.equals(String.valueOf(response.get("status")))) {
+                            // Update the “dashboard” list (unread badge, last‑message preview)
+                            updateConversation(userId, username, message, false);
+
+                            // Insert the new bubble into the open modal
+                            // We reuse the same TIME_FORMAT that the class already defines.
+                            String now = java.time.LocalTime.now().format(TIME_FORMAT);
+                            FriendRequestModal.ChatMessage myMsg =
+                                    new FriendRequestModal.ChatMessage(
+                                            session.getUsername(),   // remitente = yo
+                                            message,                 // contenido
+                                            now,                     // hora
+                                            true,                    // isMine = true
+                                            false);                  // pending = false
+                            chatModal.addMessage(myMsg);
+
+                            // (optional) scroll to the newest message – `addMessage` already does it.
+                        } else {
+                            JOptionPane.showMessageDialog(chatModal,
+                                    String.valueOf(response.getOrDefault("message", "No se pudo enviar el mensaje")));
+                        }
+                    } catch (IOException ex) {
+                        JOptionPane.showMessageDialog(chatModal, "Error de conexión: " + ex.getMessage());
+                    }
+                });
+                chatModal.setOnCancelListener(chatModal::dispose);
+                chatModal.setVisible(true);
+            }
+
+            @Override
+            protected void propagateError(Throwable ex) {
+                JOptionPane.showMessageDialog(dashboardWindow,
+                        "Error obteniendo historial: " + ex.getMessage(),
+                        "Historial", JOptionPane.ERROR_MESSAGE);
+            }
+        }.execute();
     }
 
     private void sendFriendRequestToUser(DashboardWindow.UserItem user) {

@@ -60,7 +60,6 @@ public class MessageDAO {
     List<Message> msgs = new ArrayList<>();
     // Cambiamos DESC por ASC para que los mensajes antiguos aparezcan primero
     String sql = "SELECT * FROM (SELECT * FROM Messages WHERE receiver_type = 'group' AND receiver_id = ? ORDER BY timestamp DESC LIMIT ?) ORDER BY timestamp ASC";
-    
     try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
         stmt.setInt(1, groupId);
         stmt.setInt(2, limit);
@@ -76,4 +75,36 @@ public class MessageDAO {
     }
     return msgs;
 }
+
+    // Retrieve recent messages between two users (friend chat)
+    public List<Message> getFriendMessages(int userId, int friendId, int limit) throws SQLException {
+        List<Message> msgs = new ArrayList<>();
+        String sql = """
+            SELECT * FROM (
+                SELECT * FROM Messages
+                WHERE (sender_id = ? AND receiver_type = 'user' AND receiver_id = ?)
+                   OR (sender_id = ? AND receiver_type = 'user' AND receiver_id = ?)
+                ORDER BY timestamp DESC
+                LIMIT ?
+            ) sub
+            ORDER BY timestamp ASC
+        """;
+        try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            stmt.setInt(2, friendId);
+            stmt.setInt(3, friendId);
+            stmt.setInt(4, userId);
+            stmt.setInt(5, limit);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                Message m = new Message();
+                m.setId(rs.getInt("id"));
+                m.setSenderId(rs.getInt("sender_id"));
+                m.setContent(rs.getString("content"));
+                m.setTimestamp(rs.getTimestamp("timestamp"));
+                msgs.add(m);
+}
+        }
+        return msgs;
+    }
 }

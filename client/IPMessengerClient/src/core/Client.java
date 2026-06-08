@@ -173,6 +173,13 @@ public class Client {
         return sendCommand(Protocol.CMD_GET_GROUPS, new HashMap<>());
     }
 
+    public Map<String, Object> getFriendHistory(int friendId, int limit) throws IOException {
+        Map<String, Object> data = new HashMap<>();
+        data.put("friendId", friendId);
+        data.put("limit", limit);
+        return sendCommand(Protocol.CMD_GET_FRIEND_HISTORY, data);
+    }
+
     public Map<String, Object> sendCommand(String command, Map<String, Object> data) throws IOException {
         sendCommandPayload(command, data);
         return waitForResponse();
