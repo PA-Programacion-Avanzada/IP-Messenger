@@ -25,6 +25,7 @@ public class Main {
     private final Map<Integer, String> userNamesById = new HashMap<>();
     private final Map<Integer, DashboardWindow.FriendConversation> conversationsByUserId = new HashMap<>();
     private final Map<Integer, ui.PanelGrupos> openGroupPanels = new HashMap<>();
+    private final Map<Integer, FriendRequestModal> openFriendModals = new HashMap<>();
 
 
     public static void main(String[] args) {
@@ -400,36 +401,6 @@ public class Main {
             }
         }); // <-- cierra setOnGroupSelectedListener
 
-        dashboardWindow.setOnCreateGroupListener((groupName, memberIds) -> {
-            if (groupName == null || groupName.trim().isEmpty()) {
-                JOptionPane.showMessageDialog(dashboardWindow, "El nombre del grupo es obligatorio.");
-                return;
-            }
-
-            new Thread(() -> {
-                try {
-                    java.util.Map<String, Object> params = new java.util.HashMap<>();
-                    params.put("name", groupName);
-                    params.put("members", memberIds);
-
-                    java.util.Map<String, Object> response = client.sendCommand("CREATE_GROUP", params);
-
-                    javax.swing.SwingUtilities.invokeLater(() -> {
-                        if (response != null && "OK".equals(String.valueOf(response.get("status")))) {
-                            JOptionPane.showMessageDialog(dashboardWindow, "Grupo '" + groupName + "' creado exitosamente.");
-                        } else {
-                            String msg = (response != null) ? String.valueOf(response.getOrDefault("message", "Error desconocido")) : "Sin respuesta del servidor";
-                            JOptionPane.showMessageDialog(dashboardWindow, "No se pudo crear el grupo: " + msg);
-                        }
-                    });
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                    javax.swing.SwingUtilities.invokeLater(() ->
-                        JOptionPane.showMessageDialog(dashboardWindow, "Error de red: " + ex.getMessage()));
-                }
-            }).start();
-        }); // <-- cierra setOnCreateGroupListener
-
         dashboardWindow.setVisible(true);
     } // <-- cierra showDashboardWindow
 
@@ -461,7 +432,15 @@ public class Main {
             @Override
             protected void onSuccess(List<FriendRequestModal.ChatMessage> history) {
                 // Build the modal and inject the history
+                FriendRequestModal existingModal = openFriendModals.get(userId);
+                if (existingModal != null && existingModal.isDisplayable()) {
+                    existingModal.toFront();
+                    existingModal.requestFocus();
+                    return;
+                }
+
                 FriendRequestModal chatModal = new FriendRequestModal(dashboardWindow, username);
+                openFriendModals.put(userId, chatModal);
                 chatModal.setMessages(history);
                 chatModal.setOnSendFriendMessageListener((recipient, message) -> {
                     try {
@@ -492,6 +471,12 @@ public class Main {
                     }
                 });
                 chatModal.setOnCancelListener(chatModal::dispose);
+                chatModal.addWindowListener(new java.awt.event.WindowAdapter() {
+                    @Override
+                    public void windowClosed(java.awt.event.WindowEvent e) {
+                        openFriendModals.remove(userId);
+                    }
+                });
                 chatModal.setVisible(true);
             }
 
@@ -607,7 +592,22 @@ public class Main {
         }
 
         if (senderId != session.getUserId() && !senderName.equals(session.getUsername())) {
+            String time = String.valueOf(message.getOrDefault("timestamp", LocalTime.now().format(TIME_FORMAT)));
+            FriendRequestModal openModal = openFriendModals.get(senderId);
             updateConversation(senderId, senderName, content, true);
+
+            if (openModal != null && openModal.isDisplayable() && openModal.isVisible()) {
+                FriendRequestModal.ChatMessage incoming = new FriendRequestModal.ChatMessage(
+                        senderName,
+                        content,
+                        time,
+                        false,
+                        false
+                );
+                openModal.addMessage(incoming);
+                return;
+            }
+
             JOptionPane.showMessageDialog(dashboardWindow,
                     senderName + ": " + content,
                     "Nuevo mensaje",

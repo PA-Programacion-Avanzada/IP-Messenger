@@ -16,13 +16,18 @@ public class GroupManager {
     private UserDAO userDAO = new UserDAO();
 
     public int createGroup(String name, int creatorId, List<Integer> invitedUserIds) throws SQLException {
-        // El grupo debe tener al menos un amigo invitado para que el creador pueda comenzar
-        if (invitedUserIds == null || invitedUserIds.isEmpty()) return -1;
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("El nombre del grupo es obligatorio.");
+        }
+        // Minimo 3 personas en total: creador + 2 invitados
+        if (invitedUserIds == null || invitedUserIds.size() < 2) {
+            throw new IllegalArgumentException("Se requieren al menos 2 amigos invitados (3 personas en total).");
+        }
 
         FriendshipDAO friendshipDAO = new FriendshipDAO();
         for (int uid : invitedUserIds) {
             if (!friendshipDAO.areFriends(creatorId, uid)) {
-                return -1;
+                throw new IllegalArgumentException("Todos los invitados deben ser amigos aceptados del creador.");
             }
         }
 

@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 
 public class ClientHandler implements Runnable {
+    private static final int MAX_MESSAGE_LENGTH = 1_048_576;
+
     private Socket socket;
     private InputStream input;
     private OutputStream output;
@@ -40,28 +42,46 @@ public class ClientHandler implements Runnable {
             while (true) {
                 // Leer longitud del mensaje (4 bytes)
                 byte[] lenBytes = new byte[4];
-                int read = input.read(lenBytes);
-                if (read == -1) break;
+                if (!readFully(input, lenBytes, 4)) {
+                    break;
+                }
+
                 int messageLength = ((lenBytes[0] & 0xFF) << 24) |
                                     ((lenBytes[1] & 0xFF) << 16) |
                                     ((lenBytes[2] & 0xFF) << 8)  |
                                     (lenBytes[3] & 0xFF);
-                if (messageLength <= 0) continue;
+                if (messageLength <= 0 || messageLength > MAX_MESSAGE_LENGTH) {
+                    sendError("Longitud de mensaje inválida: " + messageLength);
+                    continue;
+                }
 
                 byte[] compressedData = new byte[messageLength];
-                int totalRead = 0;
-                while (totalRead < messageLength) {
-                    int r = input.read(compressedData, totalRead, messageLength - totalRead);
-                    if (r == -1) break;
-                    totalRead += r;
+                if (!readFully(input, compressedData, messageLength)) {
+                    sendError("Payload incompleto");
+                    break;
                 }
-                byte[] decompressed = LZ77Compressor.decompress(compressedData);
-                String json = new String(decompressed, "UTF-8");
-                Logger.log("Recibido: " + json);
 
-                Map<String, Object> request = JSONParser.fromJson(json, Map.class);
-                String command = (String) request.get("command");
-                Map<String, Object> data = (Map<String, Object>) request.get("data");
+                Map<String, Object> request;
+                String command;
+                Map<String, Object> data;
+
+                try {
+                    byte[] decompressed = LZ77Compressor.decompress(compressedData);
+                    String json = new String(decompressed, "UTF-8");
+                    Logger.log("Recibido: " + json);
+
+                    request = JSONParser.fromJson(json, Map.class);
+                    if (request == null) {
+                        sendError("Solicitud inválida");
+                        continue;
+                    }
+                    command = (String) request.get("command");
+                    data = (Map<String, Object>) request.get("data");
+                } catch (IllegalArgumentException | RuntimeException ex) {
+                    Logger.log("Payload inválido en ClientHandler: " + ex.getMessage());
+                    sendError("Payload inválido: " + ex.getMessage());
+                    continue;
+                }
 
                 if (command == null) {
                     sendError("Comando no especificado");
@@ -518,11 +538,24 @@ public class ClientHandler implements Runnable {
     }
 
     private void handleCreateGroup(Map<String, Object> data) throws SQLException, IOException {
+        if (data == null) {
+            sendError("Datos inválidos para crear grupo");
+            return;
+        }
+
         String groupName = (String) data.get("groupName");
         Object rawInvited = data.get("invitedUserIds");
         List<Integer> invitedUserIds = convertToIntegerList(rawInvited);
         GroupManager gm = new GroupManager();
-        int groupId = gm.createGroup(groupName, currentUser.getId(), invitedUserIds);
+        int groupId;
+
+        try {
+            groupId = gm.createGroup(groupName, currentUser.getId(), invitedUserIds);
+        } catch (IllegalArgumentException ex) {
+            sendError(ex.getMessage());
+            return;
+        }
+
         if (groupId != -1) {
             Map<String, Object> response = new HashMap<>();
             response.put("status", Protocol.RES_OK);
@@ -536,7 +569,7 @@ public class ClientHandler implements Runnable {
                 sendGroupListToUser(userId);
             }
         } else {
-            sendError("No se pudo crear el grupo. Verifica que hayas seleccionado al menos un amigo y que sean tus amigos aceptados.");
+            sendError("No se pudo crear el grupo.");
         }
     }
 
@@ -598,6 +631,18 @@ public class ClientHandler implements Runnable {
         // Por simplicidad, añade un método getUserById en UserManager.
         User u = new UserDAO().findById(userId);
         return u != null ? u.getUsername() : null;
+    }
+
+    private static boolean readFully(InputStream in, byte[] buffer, int length) throws IOException {
+        int totalRead = 0;
+        while (totalRead < length) {
+            int r = in.read(buffer, totalRead, length - totalRead);
+            if (r == -1) {
+                return false;
+            }
+            totalRead += r;
+        }
+        return true;
     }
 
     private void disconnect() {
