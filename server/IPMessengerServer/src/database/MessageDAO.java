@@ -21,7 +21,7 @@ public class MessageDAO {
 
     public List<Message> getPendingMessagesForUser(int userId) throws SQLException {
         List<Message> pending = new ArrayList<>();
-        String sql = "SELECT * FROM Messages WHERE receiver_type = 'user' AND receiver_id = ? AND status = 'pending' ORDER BY timestamp ASC";
+        String sql = "SELECT * FROM Messages WHERE receiver_type IN ('user','temp') AND receiver_id = ? AND status = 'pending' ORDER BY timestamp ASC";
         try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
             stmt.setInt(1, userId);
             ResultSet rs = stmt.executeQuery();
@@ -109,5 +109,31 @@ public class MessageDAO {
             }
         }
         return msgs;
+    }
+
+    public void deleteTemporaryMessagesBetweenUsers(int userA, int userB) throws SQLException {
+        String sql = """
+            DELETE FROM Messages
+            WHERE (
+                    receiver_type = 'temp'
+                    AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+                  )
+               OR (
+                    receiver_type = 'user'
+                    AND status = 'pending'
+                    AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+                  )
+        """;
+        try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
+            stmt.setInt(1, userA);
+            stmt.setInt(2, userB);
+            stmt.setInt(3, userB);
+            stmt.setInt(4, userA);
+            stmt.setInt(5, userA);
+            stmt.setInt(6, userB);
+            stmt.setInt(7, userB);
+            stmt.setInt(8, userA);
+            stmt.executeUpdate();
+        }
     }
 }

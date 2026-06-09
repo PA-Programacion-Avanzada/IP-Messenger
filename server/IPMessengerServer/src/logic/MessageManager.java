@@ -13,12 +13,16 @@ public class MessageManager {
     public void saveTemporaryMessage(int senderId, int receiverId, String content) throws SQLException {
         Message msg = new Message();
         msg.setSenderId(senderId);
-        msg.setReceiverType("user");                 // siempre a un usuario
+        msg.setReceiverType("temp");                 // mensajes temporales no deben mezclarse con chat de amigos
         msg.setReceiverId(receiverId);
         msg.setContent(content);
         msg.setStatus("pending");                     // <‑‑ marca como pendiente
         // el timestamp se asigna automáticamente por la BD (DEFAULT CURRENT_TIMESTAMP)
         messageDAO.saveMessage(msg);
+    }
+
+    public void deleteTemporaryMessagesBetweenUsers(int userA, int userB) throws SQLException {
+        messageDAO.deleteTemporaryMessagesBetweenUsers(userA, userB);
     }
 
     public void sendFriendMessage(int senderId, int receiverId, String content) throws SQLException {

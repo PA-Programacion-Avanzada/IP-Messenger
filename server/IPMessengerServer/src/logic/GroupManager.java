@@ -50,10 +50,9 @@ public class GroupManager {
         memberDAO.inviteMember(groupId, creatorId);
         memberDAO.updateStatus(groupId, creatorId, "accepted");
 
-        // Agregar a los demas miembros directamente como aceptados
+        // Agregar a los demas miembros como invitados para que acepten/rechacen
         for (int uid : validInvitedUserIds) {
             memberDAO.inviteMember(groupId, uid);
-            memberDAO.updateStatus(groupId, uid, "accepted");
         }
         return groupId;
     }

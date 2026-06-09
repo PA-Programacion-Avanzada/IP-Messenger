@@ -36,6 +36,9 @@ public class FriendshipManager {
         } else {
             friendshipDAO.createFriendship(friendId, userId, "accepted");
         }
+
+        // Al convertirse en amigos, eliminamos mensajes temporales entre ambos
+        new MessageManager().deleteTemporaryMessagesBetweenUsers(userId, friendId);
     }
 
     public boolean rejectRequest(int userId, int friendId) throws SQLException {

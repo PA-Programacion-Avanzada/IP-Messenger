@@ -660,9 +660,9 @@ public class ClientHandler implements Runnable {
 
             sendGroupListToUser(currentUser.getId());
 
-            // Notificar inmediatamente a los usuarios agregados si están conectados
+            // Notificar invitación a los usuarios agregados si están conectados
             for (int userId : invitedUserIds) {
-                sendGroupListToUser(userId);
+                sendGroupInviteListToUser(userId);
             }
         } else {
             sendError("No se pudo crear el grupo.");
