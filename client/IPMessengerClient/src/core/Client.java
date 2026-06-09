@@ -214,6 +214,12 @@ public class Client {
         return sendCommand(Protocol.CMD_INVITE_TO_GROUP, data);
     }
 
+    public Map<String, Object> leaveGroup(int groupId) throws IOException {
+        Map<String, Object> data = new HashMap<>();
+        data.put("groupId", groupId);
+        return sendCommand(Protocol.CMD_LEAVE_GROUP, data);
+    }
+
     public Map<String, Object> acceptGroupInvite(int groupId) throws IOException {
         Map<String, Object> data = new HashMap<>();
         data.put("groupId", groupId);

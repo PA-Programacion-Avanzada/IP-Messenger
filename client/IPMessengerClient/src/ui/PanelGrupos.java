@@ -39,10 +39,19 @@ public class PanelGrupos extends JPanel {
         void onSendGroupMessage(String message);
     }
 
+    public interface OnLeaveGroupListener {
+        void onLeaveGroup();
+    }
+
     private OnSendGroupMessageListener onSendGroupMessageListener;
+    private OnLeaveGroupListener onLeaveGroupListener;
 
     public void setOnSendGroupMessageListener(OnSendGroupMessageListener listener) {
         this.onSendGroupMessageListener = listener;
+    }
+
+    public void setOnLeaveGroupListener(OnLeaveGroupListener listener) {
+        this.onLeaveGroupListener = listener;
     }
 
     public PanelGrupos() {
@@ -363,6 +372,30 @@ public class PanelGrupos extends JPanel {
             membersContainer.add(Box.createRigidArea(new Dimension(0, 10)));
         }
         membersContainer.add(Box.createVerticalGlue());
+
+        // Botón para salir del grupo
+        JButton leaveBtn = new JButton("Salir del grupo");
+        leaveBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        leaveBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        leaveBtn.setBackground(new Color(240, 240, 240));
+        leaveBtn.setForeground(Color.BLACK);
+        leaveBtn.setFocusPainted(false);
+        leaveBtn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 0, 0)),
+                new EmptyBorder(8, 14, 8, 14)));
+        leaveBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        leaveBtn.addActionListener(e -> {
+            int sel = JOptionPane.showConfirmDialog(this,
+                    "¿Estás seguro que quieres salir del grupo?",
+                    "Salir del grupo",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.QUESTION_MESSAGE);
+            if (sel == JOptionPane.YES_OPTION && onLeaveGroupListener != null) {
+                onLeaveGroupListener.onLeaveGroup();
+            }
+        });
+        membersContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+        membersContainer.add(leaveBtn);
         membersContainer.revalidate();
         membersContainer.repaint();
     }

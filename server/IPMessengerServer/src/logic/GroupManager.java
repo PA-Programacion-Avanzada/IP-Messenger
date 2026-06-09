@@ -78,12 +78,19 @@ public class GroupManager {
         }
     }
 
-    public void leaveGroup(int groupId, int userId) throws SQLException {
+    /**
+     * Elimina al usuario del grupo. Si el grupo queda con menos de 3 miembros activos,
+     * elimina también el grupo.
+     * @return true si el grupo fue eliminado, false si solo se eliminó el miembro.
+     */
+    public boolean leaveGroup(int groupId, int userId) throws SQLException {
         memberDAO.deleteMember(groupId, userId);
         int activeCount = memberDAO.countAcceptedMembers(groupId);
         if (activeCount < 3) {
             groupDAO.deleteGroup(groupId);
+            return true;
         }
+        return false;
     }
 
     public List<Group> getGroupsForUser(int userId) throws SQLException {

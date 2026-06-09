@@ -153,6 +153,9 @@ public class ClientHandler implements Runnable {
                     case Protocol.CMD_GET_GROUP_HISTORY:
                         handleGetGroupHistory(data);
                         break;
+                    case Protocol.CMD_LEAVE_GROUP:
+                        handleLeaveGroup(data);
+                        break;
                     case "GET_FRIEND_HISTORY":
                         handleGetFriendHistory(data);
                         break;
@@ -708,6 +711,31 @@ public class ClientHandler implements Runnable {
         for (int userId : invitedUserIds) {
             sendGroupInviteListToUser(userId);
         }
+    }
+
+    private void handleLeaveGroup(Map<String, Object> data) throws SQLException, IOException {
+        if (data == null || data.get("groupId") == null) {
+            sendError("groupId requerido");
+            return;
+        }
+        int groupId = ((Number) data.get("groupId")).intValue();
+
+        GroupManager gm = new GroupManager();
+        // Obtener miembros actuales antes de eliminar para notificarles
+        List<User> members = gm.getGroupMembers(groupId);
+        java.util.List<Integer> memberIds = new java.util.ArrayList<>();
+        for (User u : members) memberIds.add(u.getId());
+
+        boolean deleted = gm.leaveGroup(groupId, currentUser.getId());
+
+        // Notificar a todos los miembros anteriores para que refresquen su lista de grupos
+        for (Integer uid : memberIds) {
+            sendGroupListToUser(uid);
+        }
+        // También notificar al propio usuario que salió
+        sendGroupListToUser(currentUser.getId());
+
+        sendOk();
     }
 
     private void handleAcceptGroupInvite(Map<String, Object> data) throws SQLException, IOException {

@@ -612,6 +612,39 @@ public class Main {
                     }
                 });
 
+                miPanelDeGrupos.setOnLeaveGroupListener(() -> {
+                    new NetworkTask<java.util.Map<String, Object>>() {
+                        @Override
+                        protected java.util.Map<String, Object> doTask() throws Exception {
+                            return client.leaveGroup(group.getGroupId());
+                        }
+
+                        @Override
+                        protected void onSuccess(java.util.Map<String, Object> response) {
+                            if (response == null) return;
+                            if (Protocol.RES_OK.equals(String.valueOf(response.get("status")))) {
+                                // Cerrar la ventana de grupo localmente
+                                javax.swing.JDialog dlg = openGroupDialogs.get(group.getGroupId());
+                                if (dlg != null) dlg.dispose();
+                                openGroupDialogs.remove(group.getGroupId());
+                                openGroupPanels.remove(group.getGroupId());
+                                // El servidor enviará actualizaciones de lista de grupos a los miembros
+                            } else {
+                                JOptionPane.showMessageDialog(dashboardWindow,
+                                        String.valueOf(response.getOrDefault("message", "No se pudo salir del grupo")),
+                                        "Salir del grupo", JOptionPane.ERROR_MESSAGE);
+                            }
+                        }
+
+                        @Override
+                        protected void propagateError(Throwable ex) {
+                            JOptionPane.showMessageDialog(dashboardWindow,
+                                    "Error al salir del grupo: " + ex.getMessage(),
+                                    "Salir del grupo", JOptionPane.ERROR_MESSAGE);
+                        }
+                    }.execute();
+                });
+
                 openGroupPanels.put(group.getGroupId(), miPanelDeGrupos);
 
                 new NetworkTask<java.util.Map<String, Object>>() {
