@@ -5,45 +5,19 @@ import javax.swing.border.*;
 import java.awt.*;
 import java.util.List;
 import java.util.ArrayList;
+import ui.PendingMessagesModal;
 
-/**
- * Modal que muestra **solo** los mensajes temporales (1‑a‑1) recibidos.
- * No permite marcar como leído – sólo visualiza el remitente, el contenido
- * y la hora.  Se reutiliza la lógica de renderizado de {@link PendingMessagesModal}.
- */
 public class TemporalMessagesModal extends JDialog {
 
-    private JList<PendingMessage> messageList;
-    private DefaultListModel<PendingMessage> listModel;
+    /* ---------------------------------------------------------------- *
+     *  Los componentes de la UI
+     * ---------------------------------------------------------------- */
+    private JList<PendingMessagesModal.PendingMessage> messageList;
+    private DefaultListModel<PendingMessagesModal.PendingMessage> listModel;
     private JButton closeButton;
     private JLabel infoLabel;
 
-    /** Simple DTO para representar cada mensaje temporal. */
-    public static class PendingMessage {
-        private final String senderName;
-        private final String content;
-        private final String timestamp;
-        private final int    messageId;   // id interno de la BD (puede ser -1)
-
-        public PendingMessage(String senderName, String content,
-                             String timestamp, int messageId) {
-            this.senderName = senderName;
-            this.content    = content;
-            this.timestamp  = timestamp;
-            this.messageId  = messageId;
-        }
-
-        public String getSenderName() { return senderName; }
-        public String getContent()    { return content; }
-        public String getTimestamp()  { return timestamp; }
-        public int    getMessageId()  { return messageId; }
-
-        @Override
-        public String toString() {
-            return senderName + " - " + timestamp + "\n" + content;
-        }
-    }
-
+    /** Constructor */
     public TemporalMessagesModal(Frame owner) {
         super(owner, "Mensajes temporales", true);
         initUI();
@@ -52,9 +26,9 @@ public class TemporalMessagesModal extends JDialog {
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
     }
 
-    /* --------------------------------------------------------------------- *
-     *  Construcción de la UI
-     * --------------------------------------------------------------------- */
+    /* ---------------------------------------------------------------- *
+     *  Construcción de la interfaz
+     * ---------------------------------------------------------------- */
     private void initUI() {
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(Color.WHITE);
@@ -63,8 +37,11 @@ public class TemporalMessagesModal extends JDialog {
                 new ShadowBorder(),
                 mainPanel.getBorder()));
 
+        // Header (título + botón cerrar)
         mainPanel.add(createHeaderPanel(), BorderLayout.NORTH);
+        // Center (lista de mensajes)
         mainPanel.add(createCenterPanel(), BorderLayout.CENTER);
+        // Footer (botón cerrar)
         mainPanel.add(createButtonPanel(), BorderLayout.SOUTH);
 
         add(mainPanel);
@@ -96,8 +73,9 @@ public class TemporalMessagesModal extends JDialog {
         center.setBackground(Color.WHITE);
         center.setBorder(BorderFactory.createEmptyBorder(5, 0, 15, 0));
 
-        infoLabel = new JLabel("<html>Estos son los mensajes temporales que has recibido "
-                + "(1‑a‑1, no persisten).<br/>Selecciona uno para ver su contenido completo.</html>");
+        infoLabel = new JLabel(
+                "<html>Estos son los mensajes temporales que has recibido (1‑a‑1, no persisten)."
+                + "<br/>Selecciona uno para ver su contenido completo.</html>");
         infoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         infoLabel.setForeground(new Color(100, 100, 100));
         center.add(infoLabel, BorderLayout.NORTH);
@@ -108,8 +86,7 @@ public class TemporalMessagesModal extends JDialog {
         messageList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         messageList.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
-                BorderFactory.createEmptyBorder(8, 8, 8, 8)
-        ));
+                BorderFactory.createEmptyBorder(8, 8, 8, 8)));
         JScrollPane scroll = new JScrollPane(messageList);
         scroll.setBorder(null);
         center.add(scroll, BorderLayout.CENTER);
@@ -128,8 +105,7 @@ public class TemporalMessagesModal extends JDialog {
         closeButton.setFocusPainted(false);
         closeButton.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
-                BorderFactory.createEmptyBorder(6, 16, 6, 16)
-        ));
+                BorderFactory.createEmptyBorder(6, 16, 6, 16)));
         closeButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         closeButton.addActionListener(e -> {
             if (onCloseListener != null) onCloseListener.onClose();
@@ -140,13 +116,13 @@ public class TemporalMessagesModal extends JDialog {
         return buttonPanel;
     }
 
-    /* --------------------------------------------------------------------- *
+    /* ---------------------------------------------------------------- *
      *  API pública del modal
-     * --------------------------------------------------------------------- */
+     * ---------------------------------------------------------------- */
     /** Reemplaza la lista completa de mensajes temporales. */
-    public void setPendingMessages(List<PendingMessage> messages) {
+    public void setPendingMessages(List<PendingMessagesModal.PendingMessage> messages) {
         listModel.clear();
-        for (PendingMessage m : messages) {
+        for (PendingMessagesModal.PendingMessage m : messages) {
             listModel.addElement(m);
         }
     }
@@ -162,10 +138,12 @@ public class TemporalMessagesModal extends JDialog {
         this.onCloseListener = listener;
     }
 
-    /* --------------------------------------------------------------------- *
+    /* ---------------------------------------------------------------- *
      *  Renderizado de cada fila de la JList
-     * --------------------------------------------------------------------- */
-    private static class PendingMessageRenderer extends JPanel implements ListCellRenderer<PendingMessage> {
+     * ---------------------------------------------------------------- */
+    private static class PendingMessageRenderer extends JPanel
+            implements ListCellRenderer<PendingMessagesModal.PendingMessage> {
+
         private final JLabel senderLabel = new JLabel();
         private final JLabel contentLabel = new JLabel();
         private final JLabel timeLabel = new JLabel();
@@ -191,11 +169,13 @@ public class TemporalMessagesModal extends JDialog {
         }
 
         @Override
-        public Component getListCellRendererComponent(JList<? extends PendingMessage> list,
-                                                      PendingMessage value,
-                                                      int index,
-                                                      boolean isSelected,
-                                                      boolean cellHasFocus) {
+        public Component getListCellRendererComponent(
+                JList<? extends PendingMessagesModal.PendingMessage> list,
+                PendingMessagesModal.PendingMessage value,
+                int index,
+                boolean isSelected,
+                boolean cellHasFocus) {
+
             senderLabel.setText(value.getSenderName());
             timeLabel.setText(value.getTimestamp());
             contentLabel.setText("<html>" + value.getContent() + "</html>");
@@ -209,9 +189,9 @@ public class TemporalMessagesModal extends JDialog {
         }
     }
 
-    /* --------------------------------------------------------------------- *
+    /* ---------------------------------------------------------------- *
      *  Borde con sombra (re‑usado en otros modales)
-     * --------------------------------------------------------------------- */
+     * ---------------------------------------------------------------- */
     private static class ShadowBorder extends AbstractBorder {
         @Override
         public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
@@ -233,16 +213,19 @@ public class TemporalMessagesModal extends JDialog {
         }
     }
 
-    /* --------------------------------------------------------------------- *
+    /* ---------------------------------------------------------------- *
      *  Punto de prueba rápida (main)
-     * --------------------------------------------------------------------- */
+     * ---------------------------------------------------------------- */
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             TemporalMessagesModal modal = new TemporalMessagesModal(null);
-            List<PendingMessage> sample = new ArrayList<>();
-            sample.add(new PendingMessage("Juan Pérez", "¿Quieres café?", "10:45", 1));
-            sample.add(new PendingMessage("María García", "Te paso el archivo.", "11:02", 2));
-            sample.add(new PendingMessage("Carlos López", "Nos vemos luego.", "09:15", 3));
+            List<PendingMessagesModal.PendingMessage> sample = new ArrayList<>();
+            sample.add(new PendingMessagesModal.PendingMessage(
+                    "Juan Pérez", "¿Quieres café?", "10:45", 1));
+            sample.add(new PendingMessagesModal.PendingMessage(
+                    "María García", "Te paso el archivo.", "11:02", 2));
+            sample.add(new PendingMessagesModal.PendingMessage(
+                    "Carlos López", "Nos vemos luego.", "09:15", 3));
             modal.setPendingMessages(sample);
             modal.setVisible(true);
         });

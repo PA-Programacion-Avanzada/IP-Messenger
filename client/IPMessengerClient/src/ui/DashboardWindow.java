@@ -427,6 +427,25 @@ public class DashboardWindow extends JFrame {
     }
 
     private JPanel createAllUsersColumn() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(230, 230, 230)),
+                BorderFactory.createEmptyBorder(8, 8, 8, 8)));
+
+        JLabel title = new JLabel("Todos los Usuarios");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        panel.add(title, BorderLayout.NORTH);
+
+        allUsersPanel = new JPanel();
+        allUsersPanel.setLayout(new BoxLayout(allUsersPanel, BoxLayout.Y_AXIS));
+        allUsersPanel.setBackground(Color.WHITE);
+        JScrollPane scroll = new JScrollPane(allUsersPanel);
+        scroll.setBorder(null);
+        scroll.getViewport().setBackground(Color.WHITE);
+        panel.add(scroll, BorderLayout.CENTER);
+
+        // Botón que ahora abre la vista de los mensajes temporales
         JButton tempMsgBtn = new JButton("Ver mis mensajes temporales");
         tempMsgBtn.setBackground(new Color(0, 123, 255));
         tempMsgBtn.setForeground(Color.WHITE);
@@ -438,6 +457,8 @@ public class DashboardWindow extends JFrame {
             }
         });
         panel.add(tempMsgBtn, BorderLayout.SOUTH);
+
+        return panel;
     }
 
     private JPanel createGroupsColumn() {
@@ -1004,12 +1025,6 @@ public class DashboardWindow extends JFrame {
     private void updateFriendBadge(int count) {
         friendBadgeLabel.setText(String.valueOf(count));
         friendBadgeLabel.setVisible(count > 0);
-    }
-
-    public void setTempMessageCount(int count) {
-        if (tempInboxBadgeLabel == null) return;
-        tempInboxBadgeLabel.setText(String.valueOf(count));
-        tempInboxBadgeLabel.setVisible(count > 0);
     }
 
     public void setPendingFriendChatCount(int count) {
