@@ -9,8 +9,11 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.swing.*;
 import java.awt.Dimension;
 import network.Protocol;
@@ -24,10 +27,13 @@ public class Main {
     private SessionData session;
     private final Map<Integer, String> userNamesById = new HashMap<>();
     private final Map<Integer, DashboardWindow.FriendConversation> conversationsByUserId = new HashMap<>();
-    private final List<PendingMessagesModal.PendingMessage> temporaryMessages = new ArrayList<>();
     private final Map<Integer, ui.PanelGrupos> openGroupPanels = new HashMap<>();
     private final Map<Integer, FriendRequestModal> openFriendModals = new HashMap<>();
     private final Map<Integer, javax.swing.JDialog> openGroupDialogs = new HashMap<>();
+    // IDs de los usuarios que SON AMIGOS del usuario logueado
+    private final Set<Integer> friendIds = new HashSet<>();
+    // Lista en memoria de los mensajes **temporales** (no‑persistentes)
+    private final List<PendingMessagesModal.PendingMessage> temporaryMessages = new ArrayList<>();
 
 
     public static void main(String[] args) {
@@ -241,27 +247,54 @@ public class Main {
         recoverModal.setVisible(true);
     }
 
-    private void setTempMessageCount(int count) {
-        dashboardWindow.setTempMessageCount(count);
-    }
-
     private void refreshPendingBadge() {
-        new NetworkTask<Integer>() {
+        new NetworkTask<List<PendingMessagesModal.PendingMessage>>() {
             @Override
-            protected Integer doTask() throws Exception {
-                Map<String, Object> resp = client.getPendingMessages();   // método cliente que añadiremos
-                List<?> msgs = (List<?>) resp.getOrDefault("messages", List.of());
-                return msgs.size();
+            protected List<PendingMessagesModal.PendingMessage> doTask() throws Exception {
+                Map<String, Object> resp = client.getPendingMessages();
+                List<?> raw = (List<?>) resp.getOrDefault("messages", List.of());
+
+                List<PendingMessagesModal.PendingMessage> friendPending = new ArrayList<>();
+
+                for (Object o : raw) {
+                    if (!(o instanceof Map<?, ?> rawMap)) continue;
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> m = (Map<String, Object>) rawMap;
+
+                    int senderId = ((Number) m.getOrDefault("senderId", -1)).intValue();
+
+                    PendingMessagesModal.PendingMessage pm = new PendingMessagesModal.PendingMessage(
+                            String.valueOf(m.getOrDefault("senderUsername", "Desconocido")),
+                            String.valueOf(m.getOrDefault("content", "")),
+                            String.valueOf(m.getOrDefault("timestamp", "")),
+                            ((Number) m.getOrDefault("id", -1)).intValue());
+
+                    if (friendIds.contains(senderId)) {
+                        // mensaje pendiente de amigo
+                        friendPending.add(pm);
+                    } else {
+                        // mensaje temporal (no‑amigo)
+                        temporaryMessages.add(pm);
+                    }
+                }
+
+                // actualizar el badge de temporales
+                setTempMessageCount(temporaryMessages.size());
+
+                return friendPending;   // solo los de amigos
             }
 
             @Override
-            protected void onSuccess(Integer count) {
+            protected void onSuccess(List<PendingMessagesModal.PendingMessage> pending) {
+                // refresca el badge de la columna “Correo”
+                int count = pending.size();
                 dashboardWindow.setPendingFriendChatCount(count);
             }
 
             @Override
             protected void propagateError(Throwable ex) {
-                // Si falla, simplemente dejamos el badge como estaba
+                // Si falla simplemente ignoramos el badge; la UI ya mostrará 0
+                dashboardWindow.setPendingFriendChatCount(0);
             }
         }.execute();
     }
@@ -309,23 +342,39 @@ public class Main {
         });
 
         dashboardWindow.setOnSendTemporaryMessageListener((message, targetUser) -> {
+            // No se permite enviar temporales a usuarios offline
             if (!targetUser.isOnline()) {
                 JOptionPane.showMessageDialog(dashboardWindow,
                         "El usuario está desconectado y no puede recibir mensajes temporales.",
                         "No disponible", JOptionPane.WARNING_MESSAGE);
                 return;
             }
+
             try {
+                // Envío al servidor
                 Map<String, Object> response = client.sendTemporaryMessage(targetUser.getUserId(), message);
                 String status = String.valueOf(response.get("status"));
+
+                // Si el servidor responde OK o PENDING, guardamos el mensaje en la lista de temporales
+                if (Protocol.RES_OK.equals(status) || "PENDING".equalsIgnoreCase(status)) {
+                    PendingMessagesModal.PendingMessage pm = new PendingMessagesModal.PendingMessage(
+                            session.getUsername(),          // remitente = yo
+                            message,
+                            LocalTime.now().format(TIME_FORMAT),
+                            -1);                            // aún no tiene ID en la BD
+
+                    temporaryMessages.add(pm);
+                    // Opcional: actualizar el badge del remitente
+                    // setTempMessageCount(temporaryMessages.size());
+                }
+
+                // Manejo de la respuesta del servidor
                 if (Protocol.RES_OK.equals(status)) {
-                    updateConversation(targetUser.getUserId(), targetUser.getName(), message, false);
+                    // Mensaje entregado inmediatamente → nada que actualizar en la UI
                 } else if ("PENDING".equalsIgnoreCase(status)) {
                     JOptionPane.showMessageDialog(dashboardWindow,
-                            "El usuario está offline; el mensaje se guardó como pendiente.",
+                            "El destinatario está offline; el mensaje se guardó como pendiente temporal.",
                             "Mensaje pendiente", JOptionPane.INFORMATION_MESSAGE);
-                    updateConversation(targetUser.getUserId(), targetUser.getName(), message, false);
-                    refreshPendingBadge();
                 } else {
                     JOptionPane.showMessageDialog(dashboardWindow,
                             response.getOrDefault("message", "No se pudo enviar el mensaje"),
@@ -337,45 +386,14 @@ public class Main {
                         "Error", JOptionPane.ERROR_MESSAGE);
             }
         });
-
+    
         dashboardWindow.setOnViewTempMessagesListener(() -> {
-            new NetworkTask<List<PendingMessagesModal.PendingMessage>>() {
-                @Override
-                protected List<PendingMessagesModal.PendingMessage> doTask() throws Exception {
-                    Map<String, Object> resp = client.getPendingMessages();
-                    List<?> raw = (List<?>) resp.getOrDefault("messages", List.of());
-                    List<PendingMessagesModal.PendingMessage> out = new ArrayList<>();
-                    for (Object o : raw) {
-                        if (o instanceof Map<?, ?> rawMap) {
-                            @SuppressWarnings("unchecked")
-                            Map<String, Object> m = (Map<String, Object>) rawMap;
-                            if ("temporary".equals(String.valueOf(m.getOrDefault("type", "")))) {
-                                out.add(new PendingMessagesModal.PendingMessage(
-                                        String.valueOf(m.getOrDefault("senderUsername", "Desconocido")),
-                                        String.valueOf(m.getOrDefault("content", "")),
-                                        String.valueOf(m.getOrDefault("timestamp", "")),
-                                        ((Number) m.getOrDefault("id", -1)).intValue()));
-                            }
-                        }
-                    }
-                    return out;
-                }
-
-                @Override
-                protected void onSuccess(List<PendingMessagesModal.PendingMessage> msgs) {
-                    TemporalMessagesModal modal = new TemporalMessagesModal(dashboardWindow);
-                    modal.setPendingMessages(msgs);
-                    modal.setVisible(true);
-                    setTempMessageCount(msgs.size());
-                }
-
-                @Override
-                protected void propagateError(Throwable ex) {
-                    JOptionPane.showMessageDialog(dashboardWindow,
-                            "Error cargando mensajes temporales: " + ex.getMessage(),
-                            "Error", JOptionPane.ERROR_MESSAGE);
-                }
-            }.execute();
+            TemporalMessagesModal modal = new TemporalMessagesModal(dashboardWindow);
+            List<PendingMessagesModal.PendingMessage> toShow = temporaryMessages.stream()
+                    .filter(pm -> !pm.getSenderName().equals(session.getUsername())) // <-- nombre correcto del getter
+                    .collect(java.util.stream.Collectors.toList());
+            modal.setPendingMessages(toShow);
+            modal.setVisible(true);
         });
 
         dashboardWindow.setOnInvitationActionListener(new DashboardWindow.OnInvitationActionListener() {
@@ -783,6 +801,47 @@ public class Main {
         String senderName = String.valueOf(message.getOrDefault("senderUsername",
                 userNamesById.getOrDefault(senderId, "Usuario " + senderId)));
 
+        //  si el remitente NO ES AMIGO NI YO → temporal 
+        if (senderId != -1
+                && !friendIds.contains(senderId)               // no es amigo
+                && senderId != session.getUserId()) {          // no es yo mismo
+            // Tratamos como mensaje **temporal**
+            PendingMessagesModal.PendingMessage pm = new PendingMessagesModal.PendingMessage(
+                    senderName,
+                    content,
+                    String.valueOf(message.getOrDefault("timestamp",
+                            LocalTime.now().format(TIME_FORMAT))),
+                    ((Number) message.getOrDefault("id", -1)).intValue());
+
+            temporaryMessages.add(pm);
+            setTempMessageCount(temporaryMessages.size());
+
+            JOptionPane.showMessageDialog(dashboardWindow,
+                    senderName + " (temporal): " + content,
+                    "Nuevo mensaje temporal",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        // -------------------  Mensaje temporal -------------------
+        if ("temporary".equals(type) || Protocol.RES_NEW_MESSAGE.equals(status) && "temporary".equals(type)) {
+            // Guardamos en la lista de temporales del cliente
+            PendingMessagesModal.PendingMessage pm = new PendingMessagesModal.PendingMessage(
+                    senderName,
+                    content,
+                    String.valueOf(message.getOrDefault("timestamp",
+                            LocalTime.now().format(TIME_FORMAT))),
+                    ((Number) message.getOrDefault("id", -1)).intValue());
+            temporaryMessages.add(pm);
+            setTempMessageCount(temporaryMessages.size());
+
+            JOptionPane.showMessageDialog(dashboardWindow,
+                    senderName + " (temporal): " + content,
+                    "Nuevo mensaje temporal",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
         if ("RES_GROUP_HISTORY".equals(status) || (message.containsKey("messages") && message.containsKey("groupId"))) {
             int groupId = ((Number) message.get("groupId")).intValue();
             java.util.List<?> mensajes = (java.util.List<?>) message.get("messages");
@@ -891,10 +950,10 @@ public class Main {
         }
 
         List<DashboardWindow.FriendConversation> friendConversations = new ArrayList<>();
-        java.util.Set<Integer> friendIds = new java.util.HashSet<>();
+        this.friendIds.clear();
         for (Map<String, Object> friend : data.getFriends()) {
             int friendId = ((Number) friend.get("id")).intValue();
-            friendIds.add(friendId);
+            this.friendIds.add(friendId);
             String friendName = String.valueOf(friend.get("username"));
             boolean online = Boolean.TRUE.equals(friend.get("online"));
             DashboardWindow.FriendConversation existing = conversationsByUserId.get(friendId);
@@ -948,6 +1007,13 @@ public class Main {
         }
         dashboardWindow.setGroups(groups);
 
+        // ----------  ACTUALIZAR CONJUNTO DE IDs DE AMIGOS ----------
+        friendIds.clear();
+        for (Map<String, Object> f : data.getFriends()) {
+            int fid = ((Number) f.get("id")).intValue();
+            friendIds.add(fid);
+        }
+
         List<DashboardWindow.GroupInvitation> groupInvites = new ArrayList<>();
         for (Map<String, Object> invite : data.getGroupInvites()) {
             int groupId = invite.get("groupId") instanceof Number ? ((Number) invite.get("groupId")).intValue() : -1;
@@ -966,6 +1032,12 @@ public class Main {
             friendInvites.add(new DashboardWindow.FriendInvitation(requesterName, requesterId, incoming));
         }
         dashboardWindow.setFriendInvitations(friendInvites);
+    }
+
+    private void setTempMessageCount(int count) {
+        if (dashboardWindow != null) {
+            dashboardWindow.setTempMessageCount(count);
+        }
     }
 
     private boolean isOwnGroupHistoryMessage(Map<?, ?> msg) {
