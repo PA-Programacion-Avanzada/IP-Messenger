@@ -24,6 +24,7 @@ public class Main {
     private SessionData session;
     private final Map<Integer, String> userNamesById = new HashMap<>();
     private final Map<Integer, DashboardWindow.FriendConversation> conversationsByUserId = new HashMap<>();
+    private final List<PendingMessagesModal.PendingMessage> temporaryMessages = new ArrayList<>();
     private final Map<Integer, ui.PanelGrupos> openGroupPanels = new HashMap<>();
     private final Map<Integer, FriendRequestModal> openFriendModals = new HashMap<>();
     private final Map<Integer, javax.swing.JDialog> openGroupDialogs = new HashMap<>();
@@ -240,6 +241,10 @@ public class Main {
         recoverModal.setVisible(true);
     }
 
+    private void setTempMessageCount(int count) {
+        dashboardWindow.setTempMessageCount(count);
+    }
+
     private void refreshPendingBadge() {
         new NetworkTask<Integer>() {
             @Override
@@ -304,17 +309,14 @@ public class Main {
         });
 
         dashboardWindow.setOnSendTemporaryMessageListener((message, targetUser) -> {
+            if (!targetUser.isOnline()) {
+                JOptionPane.showMessageDialog(dashboardWindow,
+                        "El usuario está desconectado y no puede recibir mensajes temporales.",
+                        "No disponible", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
             try {
-                if (targetUser == null) {
-                    JOptionPane.showMessageDialog(dashboardWindow,
-                            "Selecciona un usuario específico para mensaje temporal.",
-                            "Mensaje temporal", JOptionPane.WARNING_MESSAGE);
-                    return;
-                }
-
-                Map<String, Object> response;
-                response = client.sendTemporaryMessage(targetUser.getUserId(), message);
-
+                Map<String, Object> response = client.sendTemporaryMessage(targetUser.getUserId(), message);
                 String status = String.valueOf(response.get("status"));
                 if (Protocol.RES_OK.equals(status)) {
                     updateConversation(targetUser.getUserId(), targetUser.getName(), message, false);
@@ -334,6 +336,46 @@ public class Main {
                         "Error de conexión: " + ex.getMessage(),
                         "Error", JOptionPane.ERROR_MESSAGE);
             }
+        });
+
+        dashboardWindow.setOnViewTempMessagesListener(() -> {
+            new NetworkTask<List<PendingMessagesModal.PendingMessage>>() {
+                @Override
+                protected List<PendingMessagesModal.PendingMessage> doTask() throws Exception {
+                    Map<String, Object> resp = client.getPendingMessages();
+                    List<?> raw = (List<?>) resp.getOrDefault("messages", List.of());
+                    List<PendingMessagesModal.PendingMessage> out = new ArrayList<>();
+                    for (Object o : raw) {
+                        if (o instanceof Map<?, ?> rawMap) {
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> m = (Map<String, Object>) rawMap;
+                            if ("temporary".equals(String.valueOf(m.getOrDefault("type", "")))) {
+                                out.add(new PendingMessagesModal.PendingMessage(
+                                        String.valueOf(m.getOrDefault("senderUsername", "Desconocido")),
+                                        String.valueOf(m.getOrDefault("content", "")),
+                                        String.valueOf(m.getOrDefault("timestamp", "")),
+                                        ((Number) m.getOrDefault("id", -1)).intValue()));
+                            }
+                        }
+                    }
+                    return out;
+                }
+
+                @Override
+                protected void onSuccess(List<PendingMessagesModal.PendingMessage> msgs) {
+                    TemporalMessagesModal modal = new TemporalMessagesModal(dashboardWindow);
+                    modal.setPendingMessages(msgs);
+                    modal.setVisible(true);
+                    setTempMessageCount(msgs.size());
+                }
+
+                @Override
+                protected void propagateError(Throwable ex) {
+                    JOptionPane.showMessageDialog(dashboardWindow,
+                            "Error cargando mensajes temporales: " + ex.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }.execute();
         });
 
         dashboardWindow.setOnInvitationActionListener(new DashboardWindow.OnInvitationActionListener() {
@@ -790,11 +832,18 @@ public class Main {
         }
 
         if ("temporary".equals(type)) {
-            updateConversation(senderId, senderName, content, true);
+            // Guardamos el mensaje en la lista interna de temporales
+            temporaryMessages.add(new PendingMessagesModal.PendingMessage(
+                    senderName,
+                    content,
+                    String.valueOf(message.getOrDefault("timestamp", LocalTime.now().format(TIME_FORMAT))),
+                    -1));
+            setTempMessageCount(temporaryMessages.size());
+
             JOptionPane.showMessageDialog(dashboardWindow,
-                senderName + " (temporal): " + content,
-                "Nuevo mensaje temporal",
-                JOptionPane.INFORMATION_MESSAGE);
+                    senderName + " (temporal): " + content,
+                    "Nuevo mensaje temporal",
+                    JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 

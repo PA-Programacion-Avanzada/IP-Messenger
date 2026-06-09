@@ -14,6 +14,9 @@ import java.util.ArrayList;
  * todos los usuarios registrados y grupos del usuario.
  */
 public class DashboardWindow extends JFrame {
+    // Campos de UI
+    private JLabel tempInboxBadgeLabel;
+    private OnViewTempMessagesListener onViewTempMessagesListener;
 
     // Invitaciones
     private JPanel friendInvitationsPanel;
@@ -367,6 +370,17 @@ public class DashboardWindow extends JFrame {
             }
         });
 
+        // badge de mensajes temporales (gris cuando 0)
+        tempInboxBadgeLabel = new JLabel("0");
+        tempInboxBadgeLabel.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        tempInboxBadgeLabel.setForeground(Color.WHITE);
+        tempInboxBadgeLabel.setBackground(new Color(220, 53, 69));
+        tempInboxBadgeLabel.setOpaque(true);
+        tempInboxBadgeLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        tempInboxBadgeLabel.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+        tempInboxBadgeLabel.setVisible(false);
+
+        // Badge de mensajes “pendientes”
         pendingInboxBadgeLabel = new JLabel("0");
         pendingInboxBadgeLabel.setFont(new Font("Segoe UI", Font.BOLD, 10));
         pendingInboxBadgeLabel.setForeground(Color.WHITE);
@@ -380,6 +394,7 @@ public class DashboardWindow extends JFrame {
         inboxPanel.setOpaque(false);
         inboxPanel.add(pendingInboxButton);
         inboxPanel.add(pendingInboxBadgeLabel);
+        inboxPanel.add(tempInboxBadgeLabel);
 
         header.add(title, BorderLayout.WEST);
         header.add(inboxPanel, BorderLayout.EAST);
@@ -412,37 +427,17 @@ public class DashboardWindow extends JFrame {
     }
 
     private JPanel createAllUsersColumn() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(Color.WHITE);
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(230, 230, 230)),
-                BorderFactory.createEmptyBorder(8, 8, 8, 8)));
-
-        JLabel title = new JLabel("Todos los Usuarios");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        panel.add(title, BorderLayout.NORTH);
-
-        allUsersPanel = new JPanel();
-        allUsersPanel.setLayout(new BoxLayout(allUsersPanel, BoxLayout.Y_AXIS));
-        allUsersPanel.setBackground(Color.WHITE);
-        JScrollPane scroll = new JScrollPane(allUsersPanel);
-        scroll.setBorder(null);
-        scroll.getViewport().setBackground(Color.WHITE);
-        panel.add(scroll, BorderLayout.CENTER);
-
-        JButton tempMsgBtn = new JButton("Mandar mensaje temporal");
+        JButton tempMsgBtn = new JButton("Ver mis mensajes temporales");
         tempMsgBtn.setBackground(new Color(0, 123, 255));
         tempMsgBtn.setForeground(Color.WHITE);
         tempMsgBtn.setFocusPainted(false);
         tempMsgBtn.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
         tempMsgBtn.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this,
-                    "Usa el botón 'Temp' en un usuario específico para enviar mensaje temporal 1 a 1.",
-                    "Mensaje temporal", JOptionPane.INFORMATION_MESSAGE);
+            if (onViewTempMessagesListener != null) {
+                onViewTempMessagesListener.onViewTempMessages();
+            }
         });
         panel.add(tempMsgBtn, BorderLayout.SOUTH);
-
-        return panel;
     }
 
     private JPanel createGroupsColumn() {
@@ -720,7 +715,16 @@ public class DashboardWindow extends JFrame {
         }
     }
 
-    // Métodos públicos para actualizar datos
+    // Interfaces de eventos
+    public interface OnViewTempMessagesListener {
+        void onViewTempMessages();
+    }
+
+    // Setters de listeners
+    public void setOnViewTempMessagesListener(OnViewTempMessagesListener listener) {
+        this.onViewTempMessagesListener = listener;
+    }
+
     public void setFriendConversations(List<FriendConversation> conversations) {
         friendListModel.clear();
         for (FriendConversation fc : conversations) {
@@ -747,6 +751,22 @@ public class DashboardWindow extends JFrame {
         }
         allUsersPanel.revalidate();
         allUsersPanel.repaint();
+    }
+
+    /* método para actualizar el badge de mensajes temporales */
+    public void setTempMessageCount(int count) {
+        if (tempInboxBadgeLabel == null) {
+            tempInboxBadgeLabel = new JLabel();
+            tempInboxBadgeLabel.setFont(new Font("Segoe UI", Font.BOLD, 10));
+            tempInboxBadgeLabel.setForeground(Color.WHITE);
+            tempInboxBadgeLabel.setBackground(new Color(220, 53, 69));
+            tempInboxBadgeLabel.setOpaque(true);
+            tempInboxBadgeLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            tempInboxBadgeLabel.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+            tempInboxBadgeLabel.setVisible(false);
+        }
+        tempInboxBadgeLabel.setText(String.valueOf(count));
+        tempInboxBadgeLabel.setVisible(count > 0);
     }
 
     private JPanel createUserRow(UserItem user) {
@@ -809,14 +829,23 @@ public class DashboardWindow extends JFrame {
         JButton tempBtn = new JButton("Temp");
         tempBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
         tempBtn.setFocusPainted(false);
-        tempBtn.setBackground(new Color(0, 123, 255));
+        tempBtn.setBackground(user.isOnline() ? new Color(0, 123, 255) : new Color(200, 200, 200));
         tempBtn.setForeground(Color.WHITE);
-        tempBtn.setToolTipText("Enviar mensaje temporal a este usuario");
+        tempBtn.setToolTipText(user.isOnline()
+                ? "Enviar mensaje temporal a este usuario"
+                : "Usuario desconectado – no se pueden enviar mensajes temporales");
+        tempBtn.setEnabled(user.isOnline());                       // <-- deshabilita cuando offline
         tempBtn.setMinimumSize(btnSize);
         tempBtn.setPreferredSize(btnSize);
         tempBtn.setMaximumSize(btnSize);
         tempBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
         tempBtn.addActionListener(e -> {
+            if (!user.isOnline()) {
+                JOptionPane.showMessageDialog(this,
+                        "El usuario está desconectado y no puede recibir mensajes temporales.",
+                        "No disponible", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
             if (onSendTemporaryMessageListener == null) {
                 return;
             }
@@ -975,6 +1004,12 @@ public class DashboardWindow extends JFrame {
     private void updateFriendBadge(int count) {
         friendBadgeLabel.setText(String.valueOf(count));
         friendBadgeLabel.setVisible(count > 0);
+    }
+
+    public void setTempMessageCount(int count) {
+        if (tempInboxBadgeLabel == null) return;
+        tempInboxBadgeLabel.setText(String.valueOf(count));
+        tempInboxBadgeLabel.setVisible(count > 0);
     }
 
     public void setPendingFriendChatCount(int count) {
