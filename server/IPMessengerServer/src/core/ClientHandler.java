@@ -437,6 +437,8 @@ public class ClientHandler implements Runnable {
             Map<String, Object> map = new HashMap<>();
             map.put("id", m.getId());
             map.put("senderId", m.getSenderId());
+            // Añadimos también el nombre de usuario del remitente para que el cliente lo muestre
+            map.put("senderUsername", getUsernameById(m.getSenderId()));
             map.put("content", m.getContent());
             map.put("timestamp", m.getTimestamp().toString());
             pendingList.add(map);
@@ -451,13 +453,13 @@ public class ClientHandler implements Runnable {
         int friendId = ((Number) data.get("friendId")).intValue();
         String content = (String) data.get("content");
         MessageManager mm = new MessageManager();
-        mm.sendFriendMessage(currentUser.getId(), friendId, content);
-        // Si el amigo está conectado, enviarle el mensaje en tiempo real
-        ClientHandler friendHandler;
         // Necesitamos obtener el username del amigo por su ID, luego buscarlo en connectedClients
         String friendUsername = getUsernameById(friendId);
-        friendHandler = connectedClients.get(friendUsername);
+        ClientHandler friendHandler = connectedClients.get(friendUsername);
+
         if (friendHandler != null) {
+            // Destinatario online: guardamos como entregado y enviamos en tiempo real
+            mm.sendFriendMessage(currentUser.getId(), friendId, content, "delivered");
             Map<String, Object> newMsg = new HashMap<>();
             newMsg.put("status", Protocol.RES_NEW_MESSAGE);
             newMsg.put("senderId", currentUser.getId());
@@ -465,6 +467,9 @@ public class ClientHandler implements Runnable {
             newMsg.put("content", content);
             newMsg.put("type", "friend");
             friendHandler.sendMessage(newMsg);
+        } else {
+            // Destinatario offline: guardamos como pendiente
+            mm.sendFriendMessage(currentUser.getId(), friendId, content, "pending");
         }
         Map<String, Object> response = new HashMap<>();
         response.put("status", Protocol.RES_OK);

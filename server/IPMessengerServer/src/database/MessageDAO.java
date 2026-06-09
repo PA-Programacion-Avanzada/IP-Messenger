@@ -82,8 +82,9 @@ public class MessageDAO {
         String sql = """
             SELECT * FROM (
                 SELECT * FROM Messages
-                WHERE (sender_id = ? AND receiver_type = 'user' AND receiver_id = ?)
-                   OR (sender_id = ? AND receiver_type = 'user' AND receiver_id = ?)
+                WHERE ((sender_id = ? AND receiver_type = 'user' AND receiver_id = ?)
+                   OR (sender_id = ? AND receiver_type = 'user' AND receiver_id = ?))
+                  AND NOT (status = 'pending' AND receiver_id = ?)
                 ORDER BY timestamp DESC
                 LIMIT ?
             ) sub
@@ -94,7 +95,9 @@ public class MessageDAO {
             stmt.setInt(2, friendId);
             stmt.setInt(3, friendId);
             stmt.setInt(4, userId);
-            stmt.setInt(5, limit);
+            // Excluir los mensajes pendientes cuyo receiver_id es el usuario que solicita
+            stmt.setInt(5, userId);
+            stmt.setInt(6, limit);
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
                 Message m = new Message();

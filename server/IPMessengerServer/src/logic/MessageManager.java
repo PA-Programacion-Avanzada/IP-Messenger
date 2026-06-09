@@ -22,12 +22,16 @@ public class MessageManager {
     }
 
     public void sendFriendMessage(int senderId, int receiverId, String content) throws SQLException {
+        sendFriendMessage(senderId, receiverId, content, "pending");
+    }
+
+    public void sendFriendMessage(int senderId, int receiverId, String content, String status) throws SQLException {
         Message msg = new Message();
         msg.setSenderId(senderId);
         msg.setReceiverType("user");
         msg.setReceiverId(receiverId);
         msg.setContent(content);
-        msg.setStatus("pending"); // inicialmente pendiente; luego se cambiará a delivered si el destinatario está online
+        msg.setStatus(status);
         messageDAO.saveMessage(msg);
     }
 
@@ -46,7 +50,7 @@ public class MessageManager {
     }
 
     public void markMessageRead(int messageId) throws SQLException {
-        messageDAO.markAsDelivered(messageId);
+        messageDAO.markAsRead(messageId);
     }
 
     public List<Message> getFriendHistory(int userId, int friendId, int limit) throws SQLException {

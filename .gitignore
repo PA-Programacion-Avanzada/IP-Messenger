@@ -23,3 +23,12 @@ messenger.db
 
 # Carpeta de ejemplo de compresión
 compresion_ejemplo/
+client/Makefile
+client/Makefile
+client/sources.txt
+client/Makefile
+server/Makefile
+.gitignore
+server/sources.txt
+client/Makefile
+server/Makefile

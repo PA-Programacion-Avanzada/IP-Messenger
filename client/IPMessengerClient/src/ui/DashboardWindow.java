@@ -17,9 +17,6 @@ public class DashboardWindow extends JFrame {
     // Campos de UI
     private JLabel tempInboxBadgeLabel;
     private OnViewTempMessagesListener onViewTempMessagesListener;
-    // Lista previa de mensajes temporales (vista rápida en el dashboard)
-    private DefaultListModel<PendingMessagesModal.PendingMessage> tempListModel;
-    private JList<PendingMessagesModal.PendingMessage> tempList;
 
     // Invitaciones
     private JPanel friendInvitationsPanel;
@@ -409,42 +406,7 @@ public class DashboardWindow extends JFrame {
         friendList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         JScrollPane scroll = new JScrollPane(friendList);
         scroll.setBorder(null);
-
-        // Centro compuesto: lista de amigos + preview de temporales
-        JPanel centerPanel = new JPanel(new BorderLayout());
-        centerPanel.setOpaque(false);
-        centerPanel.add(scroll, BorderLayout.CENTER);
-
-        // Preview de mensajes temporales (hasta 4)
-        tempListModel = new DefaultListModel<>();
-        tempList = new JList<>(tempListModel);
-        tempList.setCellRenderer(new TempMessageRenderer());
-        tempList.setVisibleRowCount(4);
-        JScrollPane tempScroll = new JScrollPane(tempList);
-        tempScroll.setBorder(BorderFactory.createEmptyBorder());
-
-        JPanel previewPanel = new JPanel(new BorderLayout());
-        previewPanel.setOpaque(false);
-        previewPanel.setBorder(BorderFactory.createEmptyBorder(8, 0, 8, 0));
-        JLabel tmpTitle = new JLabel("Mensajes temporales");
-        tmpTitle.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        previewPanel.add(tmpTitle, BorderLayout.NORTH);
-        previewPanel.add(tempScroll, BorderLayout.CENTER);
-
-        JButton viewTempBtn = new JButton("Ver todos");
-        viewTempBtn.setFocusPainted(false);
-        viewTempBtn.setBackground(new Color(0, 123, 255));
-        viewTempBtn.setForeground(Color.WHITE);
-        viewTempBtn.addActionListener(e -> {
-            if (onViewTempMessagesListener != null) onViewTempMessagesListener.onViewTempMessages();
-        });
-        JPanel btnWrap = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-        btnWrap.setOpaque(false);
-        btnWrap.add(viewTempBtn);
-        previewPanel.add(btnWrap, BorderLayout.SOUTH);
-
-        centerPanel.add(previewPanel, BorderLayout.SOUTH);
-        panel.add(centerPanel, BorderLayout.CENTER);
+        panel.add(scroll, BorderLayout.CENTER);
 
         JButton openChatBtn = new JButton("Abrir chat de amigo");
         openChatBtn.setBackground(new Color(0, 123, 255));
@@ -774,47 +736,7 @@ public class DashboardWindow extends JFrame {
         }
     }
 
-    // Renderer para lista previa de mensajes temporales
-    private class TempMessageRenderer extends JPanel implements ListCellRenderer<PendingMessagesModal.PendingMessage> {
-        private final JLabel senderLabel = new JLabel();
-        private final JLabel contentLabel = new JLabel();
-        private final JLabel timeLabel = new JLabel();
-
-        TempMessageRenderer() {
-            setLayout(new BorderLayout(8, 2));
-            setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
-            setBackground(Color.WHITE);
-
-            senderLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
-            timeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 10));
-            timeLabel.setForeground(Color.GRAY);
-            contentLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-            contentLabel.setForeground(new Color(70, 70, 70));
-
-            JPanel top = new JPanel(new BorderLayout());
-            top.setOpaque(false);
-            top.add(senderLabel, BorderLayout.WEST);
-            top.add(timeLabel, BorderLayout.EAST);
-
-            add(top, BorderLayout.NORTH);
-            add(contentLabel, BorderLayout.CENTER);
-        }
-
-        @Override
-        public Component getListCellRendererComponent(JList<? extends PendingMessagesModal.PendingMessage> list,
-                                                      PendingMessagesModal.PendingMessage value,
-                                                      int index,
-                                                      boolean isSelected,
-                                                      boolean cellHasFocus) {
-            senderLabel.setText(value.getSenderName());
-            String txt = value.getContent();
-            if (txt.length() > 60) txt = txt.substring(0, 57) + "...";
-            contentLabel.setText(txt);
-            timeLabel.setText(value.getTimestamp());
-            setBackground(isSelected ? new Color(230, 242, 255) : Color.WHITE);
-            return this;
-        }
-    }
+    
 
     // Interfaces de eventos
     public interface OnViewTempMessagesListener {
@@ -854,22 +776,7 @@ public class DashboardWindow extends JFrame {
         allUsersPanel.repaint();
     }
 
-    /** Reemplaza el contenido de la vista previa de mensajes temporales. */
-    public void setTempMessages(List<PendingMessagesModal.PendingMessage> messages) {
-        if (tempListModel == null) {
-            tempListModel = new DefaultListModel<>();
-            tempList = new JList<>(tempListModel);
-            tempList.setCellRenderer(new TempMessageRenderer());
-        }
-        tempListModel.clear();
-        if (messages != null && !messages.isEmpty()) {
-            int limit = Math.min(messages.size(), 4);
-            for (int i = 0; i < limit; i++) tempListModel.addElement(messages.get(i));
-            setTempMessageCount(messages.size());
-        } else {
-            setTempMessageCount(0);
-        }
-    }
+    
 
     /* método para actualizar el badge de mensajes temporales */
     public void setTempMessageCount(int count) {

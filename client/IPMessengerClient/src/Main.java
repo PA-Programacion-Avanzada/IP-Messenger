@@ -295,8 +295,7 @@ public class Main {
                 // refresca el badge de la columna “Correo”
                 int count = pending.size();
                 dashboardWindow.setPendingFriendChatCount(count);
-                // Actualizar preview de mensajes temporales en el dashboard
-                if (dashboardWindow != null) dashboardWindow.setTempMessages(temporaryMessages);
+                // preview removed from Friends column — temporales se ven desde el panel central
             }
 
             @Override
@@ -371,9 +370,8 @@ public class Main {
                             LocalTime.now().format(TIME_FORMAT),
                             -1);                            // aún no tiene ID en la BD
                     temporaryMessages.add(pm);
-                    // actualizar badge y preview
+                    // actualizar badge (preview eliminado de la columna Amigos)
                     setTempMessageCount(temporaryMessages.size());
-                    if (dashboardWindow != null) dashboardWindow.setTempMessages(temporaryMessages);
                 }
 
                 // Manejo de la respuesta del servidor
@@ -825,8 +823,7 @@ public class Main {
             setTempMessageCount(temporaryMessages.size());
 
             // Agregar notificación agregada en lugar de pop‑up individual
-                if (dashboardWindow != null) dashboardWindow.setTempMessages(temporaryMessages);
-                scheduleAggregatedNotification();
+            scheduleAggregatedNotification();
             return;
         }
 
