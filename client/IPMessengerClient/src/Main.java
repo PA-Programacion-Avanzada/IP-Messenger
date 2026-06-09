@@ -34,6 +34,9 @@ public class Main {
     private final Set<Integer> friendIds = new HashSet<>();
     // Lista en memoria de los mensajes **temporales** (no‑persistentes)
     private final List<PendingMessagesModal.PendingMessage> temporaryMessages = new ArrayList<>();
+    // Acumulador para notificaciones agregadas de mensajes entrantes
+    private int aggregatedNewMessageCount = 0;
+    private javax.swing.Timer aggregatedNotificationTimer;
 
 
     public static void main(String[] args) {
@@ -254,6 +257,9 @@ public class Main {
                 Map<String, Object> resp = client.getPendingMessages();
                 List<?> raw = (List<?>) resp.getOrDefault("messages", List.of());
 
+                // Limpiar la lista temporal local para evitar duplicados
+                temporaryMessages.clear();
+
                 List<PendingMessagesModal.PendingMessage> friendPending = new ArrayList<>();
 
                 for (Object o : raw) {
@@ -289,6 +295,8 @@ public class Main {
                 // refresca el badge de la columna “Correo”
                 int count = pending.size();
                 dashboardWindow.setPendingFriendChatCount(count);
+                // Actualizar preview de mensajes temporales en el dashboard
+                if (dashboardWindow != null) dashboardWindow.setTempMessages(temporaryMessages);
             }
 
             @Override
@@ -362,10 +370,10 @@ public class Main {
                             message,
                             LocalTime.now().format(TIME_FORMAT),
                             -1);                            // aún no tiene ID en la BD
-
                     temporaryMessages.add(pm);
-                    // Opcional: actualizar el badge del remitente
-                    // setTempMessageCount(temporaryMessages.size());
+                    // actualizar badge y preview
+                    setTempMessageCount(temporaryMessages.size());
+                    if (dashboardWindow != null) dashboardWindow.setTempMessages(temporaryMessages);
                 }
 
                 // Manejo de la respuesta del servidor
@@ -484,17 +492,20 @@ public class Main {
                     List<?> raw = (List<?>) resp.get("messages");
                     List<PendingMessagesModal.PendingMessage> out = new ArrayList<>();
                     for (Object o : raw) {
-                        if (o instanceof Map<?, ?> rawMap) {
-                            @SuppressWarnings("unchecked")
-                            Map<String, Object> m = (Map<String, Object>) rawMap;
+                        if (!(o instanceof Map<?, ?> rawMap)) continue;
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> m = (Map<String, Object>) rawMap;
 
-                            int id = ((Number) m.getOrDefault("id", -1)).intValue();
-                            String sender = String.valueOf(m.getOrDefault("senderUsername", "Desconocido"));
-                            String content = String.valueOf(m.getOrDefault("content", ""));
-                            String ts = String.valueOf(m.getOrDefault("timestamp", ""));
+                        int senderId = ((Number) m.getOrDefault("senderId", -1)).intValue();
+                        // Solo mostrar en "Correo" los mensajes enviados por amigos (no los temporales)
+                        if (!friendIds.contains(senderId)) continue;
 
-                            out.add(new PendingMessagesModal.PendingMessage(sender, content, ts, id));
-                        }
+                        int id = ((Number) m.getOrDefault("id", -1)).intValue();
+                        String sender = String.valueOf(m.getOrDefault("senderUsername", "Desconocido"));
+                        String content = String.valueOf(m.getOrDefault("content", ""));
+                        String ts = String.valueOf(m.getOrDefault("timestamp", ""));
+
+                        out.add(new PendingMessagesModal.PendingMessage(sender, content, ts, id));
                     }
                     return out;
                 }
@@ -801,44 +812,21 @@ public class Main {
         String senderName = String.valueOf(message.getOrDefault("senderUsername",
                 userNamesById.getOrDefault(senderId, "Usuario " + senderId)));
 
-        //  si el remitente NO ES AMIGO NI YO → temporal 
-        if (senderId != -1
-                && !friendIds.contains(senderId)               // no es amigo
-                && senderId != session.getUserId()) {          // no es yo mismo
-            // Tratamos como mensaje **temporal**
-            PendingMessagesModal.PendingMessage pm = new PendingMessagesModal.PendingMessage(
-                    senderName,
-                    content,
-                    String.valueOf(message.getOrDefault("timestamp",
-                            LocalTime.now().format(TIME_FORMAT))),
-                    ((Number) message.getOrDefault("id", -1)).intValue());
-
-            temporaryMessages.add(pm);
-            setTempMessageCount(temporaryMessages.size());
-
-            JOptionPane.showMessageDialog(dashboardWindow,
-                    senderName + " (temporal): " + content,
-                    "Nuevo mensaje temporal",
-                    JOptionPane.INFORMATION_MESSAGE);
-            return;
-        }
-
         // -------------------  Mensaje temporal -------------------
-        if ("temporary".equals(type) || Protocol.RES_NEW_MESSAGE.equals(status) && "temporary".equals(type)) {
+        if ("temporary".equals(type) || (senderId != -1 && !friendIds.contains(senderId) && senderId != session.getUserId())) {
             // Guardamos en la lista de temporales del cliente
             PendingMessagesModal.PendingMessage pm = new PendingMessagesModal.PendingMessage(
-                    senderName,
-                    content,
-                    String.valueOf(message.getOrDefault("timestamp",
-                            LocalTime.now().format(TIME_FORMAT))),
-                    ((Number) message.getOrDefault("id", -1)).intValue());
+                senderName,
+                content,
+                String.valueOf(message.getOrDefault("timestamp",
+                    LocalTime.now().format(TIME_FORMAT))),
+                ((Number) message.getOrDefault("id", -1)).intValue());
             temporaryMessages.add(pm);
             setTempMessageCount(temporaryMessages.size());
 
-            JOptionPane.showMessageDialog(dashboardWindow,
-                    senderName + " (temporal): " + content,
-                    "Nuevo mensaje temporal",
-                    JOptionPane.INFORMATION_MESSAGE);
+            // Agregar notificación agregada en lugar de pop‑up individual
+                if (dashboardWindow != null) dashboardWindow.setTempMessages(temporaryMessages);
+                scheduleAggregatedNotification();
             return;
         }
 
@@ -874,37 +862,19 @@ public class Main {
                 panel.addMessage(content, senderName, esMio);
                 return;
             } else {
-                JOptionPane.showMessageDialog(dashboardWindow,
-                        senderName + " (grupo): " + content,
-                        "Nuevo mensaje en el grupo",
-                        JOptionPane.INFORMATION_MESSAGE);
+                // Agrupar notificaciones de grupo en un solo aviso
+                scheduleAggregatedNotification();
                 return;
             }
         }
 
         if ("general".equals(type)) {
-            JOptionPane.showMessageDialog(dashboardWindow,
-                    senderName + " (chat general): " + content,
-                    "Mensaje general",
-                    JOptionPane.INFORMATION_MESSAGE);
+            // Agrupar notificaciones generales
+            scheduleAggregatedNotification();
             return;
         }
 
-        if ("temporary".equals(type)) {
-            // Guardamos el mensaje en la lista interna de temporales
-            temporaryMessages.add(new PendingMessagesModal.PendingMessage(
-                    senderName,
-                    content,
-                    String.valueOf(message.getOrDefault("timestamp", LocalTime.now().format(TIME_FORMAT))),
-                    -1));
-            setTempMessageCount(temporaryMessages.size());
-
-            JOptionPane.showMessageDialog(dashboardWindow,
-                    senderName + " (temporal): " + content,
-                    "Nuevo mensaje temporal",
-                    JOptionPane.INFORMATION_MESSAGE);
-            return;
-        }
+        
 
         if (senderId != session.getUserId() && !senderName.equals(session.getUsername())) {
             String time = String.valueOf(message.getOrDefault("timestamp", LocalTime.now().format(TIME_FORMAT)));
@@ -923,11 +893,30 @@ public class Main {
                 return;
             }
 
-            JOptionPane.showMessageDialog(dashboardWindow,
-                    senderName + ": " + content,
-                    "Nuevo mensaje",
-                    JOptionPane.INFORMATION_MESSAGE);
+            // Agrupar notificaciones de nuevos mensajes de amigos
+            scheduleAggregatedNotification();
         }
+    }
+
+    private void scheduleAggregatedNotification() {
+        aggregatedNewMessageCount++;
+        if (aggregatedNotificationTimer == null) {
+            aggregatedNotificationTimer = new javax.swing.Timer(1200, e -> {
+                try {
+                    String title = "Nuevos mensajes";
+                    String text = "Tienes " + aggregatedNewMessageCount + " mensajes nuevos.";
+                    if (dashboardWindow != null) {
+                        JOptionPane.showMessageDialog(dashboardWindow, text, title, JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        JOptionPane.showMessageDialog(null, text, title, JOptionPane.INFORMATION_MESSAGE);
+                    }
+                } finally {
+                    aggregatedNewMessageCount = 0;
+                }
+            });
+            aggregatedNotificationTimer.setRepeats(false);
+        }
+        aggregatedNotificationTimer.restart();
     }
 
     private void updateConversation(int userId, String username, String lastMessage, boolean unread) {
