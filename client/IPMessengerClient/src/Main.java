@@ -34,9 +34,6 @@ public class Main {
     private final Set<Integer> friendIds = new HashSet<>();
     // Lista en memoria de los mensajes **temporales** (no‑persistentes)
     private final List<PendingMessagesModal.PendingMessage> temporaryMessages = new ArrayList<>();
-    // Acumulador para notificaciones agregadas de mensajes entrantes
-    private int aggregatedNewMessageCount = 0;
-    private javax.swing.Timer aggregatedNotificationTimer;
 
 
     public static void main(String[] args) {
@@ -361,18 +358,6 @@ public class Main {
                 // Envío al servidor
                 Map<String, Object> response = client.sendTemporaryMessage(targetUser.getUserId(), message);
                 String status = String.valueOf(response.get("status"));
-
-                // Si el servidor responde OK o PENDING, guardamos el mensaje en la lista de temporales
-                if (Protocol.RES_OK.equals(status) || "PENDING".equalsIgnoreCase(status)) {
-                    PendingMessagesModal.PendingMessage pm = new PendingMessagesModal.PendingMessage(
-                            session.getUsername(),          // remitente = yo
-                            message,
-                            LocalTime.now().format(TIME_FORMAT),
-                            -1);                            // aún no tiene ID en la BD
-                    temporaryMessages.add(pm);
-                    // actualizar badge (preview eliminado de la columna Amigos)
-                    setTempMessageCount(temporaryMessages.size());
-                }
 
                 // Manejo de la respuesta del servidor
                 if (Protocol.RES_OK.equals(status)) {
@@ -854,9 +839,6 @@ public class Main {
                 ((Number) message.getOrDefault("id", -1)).intValue());
             temporaryMessages.add(pm);
             setTempMessageCount(temporaryMessages.size());
-
-            // Agregar notificación agregada en lugar de pop‑up individual
-            scheduleAggregatedNotification();
             return;
         }
 
@@ -892,15 +874,13 @@ public class Main {
                 panel.addMessage(content, senderName, esMio);
                 return;
             } else {
-                // Agrupar notificaciones de grupo en un solo aviso
-                scheduleAggregatedNotification();
+                // none
                 return;
             }
         }
 
         if ("general".equals(type)) {
-            // Agrupar notificaciones generales
-            scheduleAggregatedNotification();
+            // none
             return;
         }
 
@@ -922,31 +902,7 @@ public class Main {
                 openModal.addMessage(incoming);
                 return;
             }
-
-            // Agrupar notificaciones de nuevos mensajes de amigos
-            scheduleAggregatedNotification();
         }
-    }
-
-    private void scheduleAggregatedNotification() {
-        aggregatedNewMessageCount++;
-        if (aggregatedNotificationTimer == null) {
-            aggregatedNotificationTimer = new javax.swing.Timer(1200, e -> {
-                try {
-                    String title = "Nuevos mensajes";
-                    String text = "Tienes " + aggregatedNewMessageCount + " mensajes nuevos.";
-                    if (dashboardWindow != null) {
-                        JOptionPane.showMessageDialog(dashboardWindow, text, title, JOptionPane.INFORMATION_MESSAGE);
-                    } else {
-                        JOptionPane.showMessageDialog(null, text, title, JOptionPane.INFORMATION_MESSAGE);
-                    }
-                } finally {
-                    aggregatedNewMessageCount = 0;
-                }
-            });
-            aggregatedNotificationTimer.setRepeats(false);
-        }
-        aggregatedNotificationTimer.restart();
     }
 
     private void updateConversation(int userId, String username, String lastMessage, boolean unread) {

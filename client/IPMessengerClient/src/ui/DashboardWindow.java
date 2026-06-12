@@ -374,7 +374,7 @@ public class DashboardWindow extends JFrame {
         tempInboxBadgeLabel = new JLabel("0");
         tempInboxBadgeLabel.setFont(new Font("Segoe UI", Font.BOLD, 10));
         tempInboxBadgeLabel.setForeground(Color.WHITE);
-        tempInboxBadgeLabel.setBackground(new Color(220, 53, 69));
+        tempInboxBadgeLabel.setBackground(new Color(220, 140, 0));
         tempInboxBadgeLabel.setOpaque(true);
         tempInboxBadgeLabel.setHorizontalAlignment(SwingConstants.CENTER);
         tempInboxBadgeLabel.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
@@ -784,7 +784,7 @@ public class DashboardWindow extends JFrame {
             tempInboxBadgeLabel = new JLabel();
             tempInboxBadgeLabel.setFont(new Font("Segoe UI", Font.BOLD, 10));
             tempInboxBadgeLabel.setForeground(Color.WHITE);
-            tempInboxBadgeLabel.setBackground(new Color(220, 53, 69));
+            tempInboxBadgeLabel.setBackground(new Color(220, 140, 0));
             tempInboxBadgeLabel.setOpaque(true);
             tempInboxBadgeLabel.setHorizontalAlignment(SwingConstants.CENTER);
             tempInboxBadgeLabel.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));

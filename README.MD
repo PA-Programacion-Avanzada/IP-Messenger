@@ -9,17 +9,16 @@ Proyecto final para la asignatura **Programación Avanzada** – Cliente-servido
 
 ## 📋 Descripción
 
-IP Messenger es una aplicación de mensajería instantánea escrita en Java. Implementa un servidor multihilo, una interfaz Swing en el cliente, persistencia en SQLite, y lógica compleja de mensajería (amigos, grupos y chat general).
+IP Messenger es una aplicación de mensajería instantánea escrita en Java. Implementa un servidor multihilo, una interfaz Swing en el cliente, persistencia en SQLite, y lógica compleja de mensajería (amigos, grupos y mensajería directa entre usuarios).  Los usuarios intercambian mensajes directamente uno‑a‑uno, ya sea entre amigos (persistidos) o con usuarios que no son amigos (mensajes temporales almacenados localmente).
 
 ## 🚀 Características principales
 
 - Autenticación (login, registro, recuperación de cuenta tras 3 fallos)
-- Chat general (“Todos”) sin persistencia (solo en memoria)
+- Mensajería directa entre usuarios (1 a 1) sin persistencia en el servidor; los mensajes entre usuarios que no son amigos se tratan como *mensajes temporales* y se almacenan localmente en la sesión del cliente.
 - Amigos: solicitudes, aceptación/rechazo, mensajes pendientes
 - Grupos: creación con 3 invitados, se activa con 2 aceptaciones, 1 rechazo elimina el grupo
 - Todos los mensajes se comprimen con **LZ77** y se serializan en **JSON**
-- Interfaz Swing con ventanas modales y panel de notificaciones
-
+- Interfaz Swing con ventanas modales y panel de notificaciones, incluyendo una alerta agregada que muestra "Nuevos mensajes" con el número de mensajes recibidos.
 ## 🛠️ Tecnologías
 
 - Java 21

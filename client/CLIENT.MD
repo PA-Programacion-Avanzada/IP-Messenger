@@ -20,13 +20,14 @@ The implementation is currently **purely UI‑only** – all of the UI widgets e
 
 | Screen | State | Notes |
 |--------|------|------|
-| **Login** (`StartWindow`) | Functional | Fires `onConnect` callback, performs basic field validation.
-| **Register** (`RegisterModal`) | Functional | Exposes `onRegister`, `onCancel`, `onSwitchToLogin` callbacks.
-| **Dashboard** (`DashboardWindow`) | Fully visual | Shows three columns; HTML‑style list rendering; badge counters update when data is bound.
-| **Chat** (`ChatModal`) | Fully visual | Simulates three‑column view; provides `onFriendChatSelected`, `onGroupSelected`, `onUserAction`, etc.
-| **Invitation** (`GroupInviteModal`, `FriendRequestModal`) | UI only | Buttons trigger callbacks.
-| **Temporary Messages** (`TemporalMessageModal`) | UI only | Uses `JTextField` placeholder and a button dialog; no backend.
-| **Pending Messages** (`PendingMessagesModal`) | UI only | Displays a simple `JList` of message objects.
+| **Login** (`StartWindow`) | Functional | Fires `onConnect` callback, performs basic field validation. |
+| **Register** (`RegisterModal`) | Functional | Exposes `onRegister`, `onCancel`, `onSwitchToLogin` callbacks. |
+| **Dashboard** (`DashboardWindow`) | Fully visual | Shows three columns; HTML‑style list rendering; badge counters update when data is bound. |
+| **Chat** (`ChatModal`) | Fully visual | Simulates three‑column view; provides `onFriendChatSelected`, `onGroupSelected`, `onUserAction`, etc. |
+| **Invitation** (`GroupInviteModal`, `FriendRequestModal`) | UI only | Buttons trigger callbacks. |
+| **Temporary Messages** (`TemporalMessageModal`) | UI only | Uses `JTextField` placeholder and a button dialog; no backend. |
+| **Pending Messages** (`PendingMessagesModal`) | UI only | Displays a simple `JList` of message objects. |
+| **Aggregated notifications** | UI only | When any new message arrives (friend, group, temporary or general), the client aggregates them and shows a single pop‑up window with the title "Nuevos mensajes" and the text "Tienes X mensajes nuevos" after a short delay. This replaces the previous behavior of opening a separate window per incoming message. |
 
 No server communication is currently wired – all data is supplied manually in the client test code.
 
@@ -60,5 +61,3 @@ The client initial version should therefore expose **only the callback interface
 * Add unit tests for UI components and controller logic.
 
 ---
-
-> **Tip** – Keep the UI code *dumb*: only manage views and forward user intent.  The business logic should stay in the controller so the UI remains easily testable and maintainable.
