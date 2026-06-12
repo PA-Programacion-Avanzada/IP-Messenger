@@ -25,7 +25,7 @@ public class FriendshipManager {
             acceptRequest(friendId, userId);
             return true;
         }
-        friendshipDAO.sendRequest(userId, friendId);
+        friendshipDAO.sendOrResetRequest(userId, friendId);
         return true;
     }
 

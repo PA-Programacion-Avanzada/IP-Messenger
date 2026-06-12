@@ -489,8 +489,15 @@ public class ClientHandler implements Runnable {
             return;
         }
         sendOk();
-        sendFriendInviteUpdateToUser(friendId);
-        sendFriendInviteList();
+        if (fm.areFriends(currentUser.getId(), friendId)) {
+            sendFriendList();
+            sendFriendInviteList();
+            sendFriendListToUser(friendId);
+            sendFriendInviteUpdateToUser(friendId);
+        } else {
+            sendFriendInviteUpdateToUser(friendId);
+            sendFriendInviteList();
+        }
     }
 
     private void handleAcceptFriendRequest(Map<String, Object> data) throws SQLException, IOException {

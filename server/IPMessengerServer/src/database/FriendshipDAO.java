@@ -16,6 +16,14 @@ public class FriendshipDAO {
         }
     }
 
+    public void sendOrResetRequest(int userId, int friendId) throws SQLException {
+        if (friendshipExists(userId, friendId)) {
+            updateStatus(userId, friendId, "pending");
+        } else {
+            sendRequest(userId, friendId);
+        }
+    }
+
     public void updateStatus(int userId, int friendId, String status) throws SQLException {
         String sql = "UPDATE Friendships SET status = ? WHERE user_id = ? AND friend_id = ?";
         try (PreparedStatement stmt = DatabaseManager.getConnection().prepareStatement(sql)) {
