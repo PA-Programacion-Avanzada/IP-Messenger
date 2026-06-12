@@ -27,7 +27,7 @@ The implementation is currently **purely UI‑only** – all of the UI widgets e
 | **Invitation** (`GroupInviteModal`, `FriendRequestModal`) | UI only | Buttons trigger callbacks. |
 | **Temporary Messages** (`TemporalMessageModal`) | UI only | Uses `JTextField` placeholder and a button dialog; no backend. |
 | **Pending Messages** (`PendingMessagesModal`) | UI only | Displays a simple `JList` of message objects. |
-| **Aggregated notifications** | UI only | When any new message arrives (friend, group, temporary or general), the client aggregates them and shows a single pop‑up window with the title "Nuevos mensajes" and the text "Tienes X mensajes nuevos" after a short delay. This replaces the previous behavior of opening a separate window per incoming message. |
+| **Aggregated notifications** | UI only | Temporary messages are excluded from pop‑up notifications. They are stored in the local temporary inbox and indicated only through the yellow badge next to "Correo". |
 
 No server communication is currently wired – all data is supplied manually in the client test code.
 

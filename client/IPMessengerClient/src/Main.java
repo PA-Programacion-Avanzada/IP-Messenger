@@ -34,6 +34,8 @@ public class Main {
     private final Set<Integer> friendIds = new HashSet<>();
     // Lista en memoria de los mensajes **temporales** (no‑persistentes)
     private final List<PendingMessagesModal.PendingMessage> temporaryMessages = new ArrayList<>();
+    private final Set<String> acknowledgedTemporaryMessageKeys = new HashSet<>();
+    private int unreadTemporaryMessageCount = 0;
 
 
     public static void main(String[] args) {
@@ -281,8 +283,10 @@ public class Main {
                     }
                 }
 
-                // actualizar el badge de temporales
-                setTempMessageCount(temporaryMessages.size());
+                // Los mensajes cargados como temporales pendientes se notifican con el badge amarillo
+                // solo si el usuario todavia no los abrio en la bandeja temporal.
+                unreadTemporaryMessageCount = countUnreadTemporaryMessages();
+                setTempMessageCount(unreadTemporaryMessageCount);
 
                 return friendPending;   // solo los de amigos
             }
@@ -384,6 +388,7 @@ public class Main {
                     .filter(pm -> !pm.getSenderName().equals(session.getUsername())) // <-- nombre correcto del getter
                     .collect(java.util.stream.Collectors.toList());
             modal.setPendingMessages(toShow);
+            acknowledgeTemporaryMessages(toShow);
             modal.setVisible(true);
         });
 
@@ -829,16 +834,8 @@ public class Main {
                 userNamesById.getOrDefault(senderId, "Usuario " + senderId)));
 
         // -------------------  Mensaje temporal -------------------
-        if ("temporary".equals(type) || (senderId != -1 && !friendIds.contains(senderId) && senderId != session.getUserId())) {
-            // Guardamos en la lista de temporales del cliente
-            PendingMessagesModal.PendingMessage pm = new PendingMessagesModal.PendingMessage(
-                senderName,
-                content,
-                String.valueOf(message.getOrDefault("timestamp",
-                    LocalTime.now().format(TIME_FORMAT))),
-                ((Number) message.getOrDefault("id", -1)).intValue());
-            temporaryMessages.add(pm);
-            setTempMessageCount(temporaryMessages.size());
+        if (isTemporaryIncomingMessage(type, senderId)) {
+            handleTemporaryIncomingMessage(message, senderName, content);
             return;
         }
 
@@ -905,18 +902,69 @@ public class Main {
         }
     }
 
+    private boolean isTemporaryIncomingMessage(String type, int senderId) {
+        return "temporary".equals(type)
+                || (senderId != -1 && !friendIds.contains(senderId) && senderId != session.getUserId());
+    }
+
+    private void handleTemporaryIncomingMessage(Map<String, Object> message, String senderName, String content) {
+        // Los temporales NO deben abrir popups ni ventanas de chat de la nada.
+        // La unica senal visual es el badge amarillo junto a "Correo".
+        PendingMessagesModal.PendingMessage pm = new PendingMessagesModal.PendingMessage(
+                senderName,
+                content,
+                String.valueOf(message.getOrDefault("timestamp",
+                        LocalTime.now().format(TIME_FORMAT))),
+                ((Number) message.getOrDefault("id", -1)).intValue());
+        temporaryMessages.add(pm);
+        if (!acknowledgedTemporaryMessageKeys.contains(getTemporaryMessageKey(pm))) {
+            unreadTemporaryMessageCount++;
+        }
+        SwingUtilities.invokeLater(() -> setTempMessageCount(unreadTemporaryMessageCount));
+    }
+
+    private void acknowledgeTemporaryMessages(List<PendingMessagesModal.PendingMessage> messages) {
+        for (PendingMessagesModal.PendingMessage message : messages) {
+            acknowledgedTemporaryMessageKeys.add(getTemporaryMessageKey(message));
+        }
+        clearTemporaryMessageNotification();
+    }
+
+    private int countUnreadTemporaryMessages() {
+        int unreadCount = 0;
+        for (PendingMessagesModal.PendingMessage message : temporaryMessages) {
+            if (!acknowledgedTemporaryMessageKeys.contains(getTemporaryMessageKey(message))) {
+                unreadCount++;
+            }
+        }
+        return unreadCount;
+    }
+
+    private String getTemporaryMessageKey(PendingMessagesModal.PendingMessage message) {
+        if (message.getMessageId() >= 0) {
+            return "id:" + message.getMessageId();
+        }
+        return message.getSenderName() + "|" + message.getTimestamp() + "|" + message.getContent();
+    }
+
+    private void clearTemporaryMessageNotification() {
+        unreadTemporaryMessageCount = 0;
+        setTempMessageCount(0);
+    }
+
     private void updateConversation(int userId, String username, String lastMessage, boolean unread) {
         userNamesById.put(userId, username);
+        DashboardWindow.FriendConversation existing = conversationsByUserId.get(userId);
         DashboardWindow.FriendConversation conversation = new DashboardWindow.FriendConversation(
                 username,
                 lastMessage,
                 LocalTime.now().format(TIME_FORMAT),
                 unread,
-                true,
+                existing == null || existing.isOnline(),
                 userId
         );
         conversationsByUserId.put(userId, conversation);
-        dashboardWindow.setFriendConversations(new ArrayList<>(conversationsByUserId.values()));
+        dashboardWindow.setFriendConversations(getVisibleFriendConversations());
     }
 
     private void refreshDashboardData(SessionData data) {
@@ -933,16 +981,27 @@ public class Main {
             boolean online = Boolean.TRUE.equals(friend.get("online"));
             DashboardWindow.FriendConversation existing = conversationsByUserId.get(friendId);
             if (existing != null) {
-                friendConversations.add(existing);
+                DashboardWindow.FriendConversation updated = new DashboardWindow.FriendConversation(
+                        friendName,
+                        existing.getLastMessage(),
+                        existing.getTime(),
+                        existing.isUnread(),
+                        online,
+                        friendId
+                );
+                conversationsByUserId.put(friendId, updated);
+                friendConversations.add(updated);
             } else {
-                friendConversations.add(new DashboardWindow.FriendConversation(
+                DashboardWindow.FriendConversation conversation = new DashboardWindow.FriendConversation(
                         friendName,
                         "Toca para chatear",
                         LocalTime.now().format(TIME_FORMAT),
                         false,
                         online,
                         friendId
-                ));
+                );
+                conversationsByUserId.put(friendId, conversation);
+                friendConversations.add(conversation);
             }
         }
 
@@ -1007,6 +1066,16 @@ public class Main {
             friendInvites.add(new DashboardWindow.FriendInvitation(requesterName, requesterId, incoming));
         }
         dashboardWindow.setFriendInvitations(friendInvites);
+    }
+
+    private List<DashboardWindow.FriendConversation> getVisibleFriendConversations() {
+        List<DashboardWindow.FriendConversation> friendConversations = new ArrayList<>();
+        for (Map.Entry<Integer, DashboardWindow.FriendConversation> entry : conversationsByUserId.entrySet()) {
+            if (friendIds.contains(entry.getKey())) {
+                friendConversations.add(entry.getValue());
+            }
+        }
+        return friendConversations;
     }
 
     private void setTempMessageCount(int count) {

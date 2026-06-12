@@ -18,7 +18,7 @@ IP Messenger es una aplicación de mensajería instantánea escrita en Java. Imp
 - Amigos: solicitudes, aceptación/rechazo, mensajes pendientes
 - Grupos: creación con 3 invitados, se activa con 2 aceptaciones, 1 rechazo elimina el grupo
 - Todos los mensajes se comprimen con **LZ77** y se serializan en **JSON**
-- Interfaz Swing con ventanas modales y panel de notificaciones, incluyendo una alerta agregada que muestra "Nuevos mensajes" con el número de mensajes recibidos.
+- Interfaz Swing con ventanas modales y panel de notificaciones. Los mensajes temporales no abren ventanas emergentes; se indican únicamente con el contador amarillo junto a "Correo".
 ## 🛠️ Tecnologías
 
 - Java 21
